@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "WebSearch",
+      "Bash(bun install:*)",
+      "Bash(bun run build:*)",
+      "Bash(bun run typecheck:*)",
+      "Bash(bun test:*)",
+      "Bash(bun run lint:*)",
+      "Bash(bun run format:check:*)",
+      "Bash(bun run format:*)"
+    ]
+  }
+}

@@ -113,6 +113,7 @@ export const endpoints = shapeshyftSchema.table(
     input_schema: jsonb("input_schema"),
     output_schema: jsonb("output_schema"),
     description: text("description"),
+    context: text("context"),
     is_active: boolean("is_active").default(true),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),

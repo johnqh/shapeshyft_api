@@ -181,6 +181,7 @@ endpointsRouter.post(
         input_schema: body.input_schema ?? null,
         output_schema: body.output_schema ?? null,
         description: body.description ?? null,
+        context: body.context ?? null,
       })
       .returning();
 
@@ -271,6 +272,7 @@ endpointsRouter.put(
         input_schema: body.input_schema ?? current.input_schema,
         output_schema: body.output_schema ?? current.output_schema,
         description: body.description ?? current.description,
+        context: body.context ?? current.context,
         is_active: body.is_active ?? current.is_active,
         updated_at: new Date(),
       })

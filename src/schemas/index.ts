@@ -159,6 +159,7 @@ export const endpointCreateSchema = z.object({
   input_schema: jsonSchemaSchema.optional(),
   output_schema: jsonSchemaSchema.optional(),
   description: z.string().max(10000).optional(),
+  context: z.string().max(10000).optional(),
 });
 
 export const endpointUpdateSchema = z.object({
@@ -170,6 +171,7 @@ export const endpointUpdateSchema = z.object({
   input_schema: jsonSchemaSchema.optional(),
   output_schema: jsonSchemaSchema.optional(),
   description: z.string().max(10000).optional(),
+  context: z.string().max(10000).optional(),
   is_active: z.boolean().optional(),
 });
 

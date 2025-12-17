@@ -95,11 +95,18 @@ export async function initDatabase() {
       input_schema JSONB,
       output_schema JSONB,
       description TEXT,
+      context TEXT,
       is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(project_id, endpoint_name)
     )
+  `;
+
+  // Migration: Add context column if it doesn't exist (for existing databases)
+  await client`
+    ALTER TABLE shapeshyft.endpoints
+    ADD COLUMN IF NOT EXISTS context TEXT
   `;
 
   await client`

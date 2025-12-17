@@ -8,6 +8,7 @@
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
     "test": "bun test",
+    "test:setup": "./scripts/setup-test-db.sh",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src",

@@ -3,7 +3,6 @@ import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
 import { db, users, llmApiKeys } from "../db";
 import { keyCreateSchema, keyUpdateSchema, keyIdParamSchema } from "../schemas";
-import { firebaseAuthMiddleware } from "../middleware/firebaseAuth";
 import {
   successResponse,
   errorResponse,
@@ -12,9 +11,6 @@ import {
 import { encryptApiKey } from "../lib/encryption";
 
 const keysRouter = new Hono();
-
-// Apply Firebase auth to all routes
-keysRouter.use("*", firebaseAuthMiddleware);
 
 /**
  * Helper to get or create user by Firebase UID

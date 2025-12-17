@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { firebaseAuthMiddleware } from "../middleware/firebaseAuth";
 import keysRouter from "./keys";
 import projectsRouter from "./projects";
 import endpointsRouter from "./endpoints";
@@ -8,12 +9,27 @@ import aiRouter from "./ai";
 const routes = new Hono();
 
 // Admin routes (Firebase auth required)
-routes.route("/users/:userId/keys", keysRouter);
-routes.route("/users/:userId/projects", projectsRouter);
-routes.route("/users/:userId/projects/:projectId/endpoints", endpointsRouter);
-routes.route("/users/:userId/analytics", analyticsRouter);
+const adminRoutes = new Hono();
+adminRoutes.use("*", firebaseAuthMiddleware);
+adminRoutes.route("/users/:userId/keys", keysRouter);
+adminRoutes.route("/users/:userId/projects", projectsRouter);
+adminRoutes.route(
+  "/users/:userId/projects/:projectId/endpoints",
+  endpointsRouter
+);
+adminRoutes.route("/users/:userId/analytics", analyticsRouter);
+routes.route("/", adminRoutes);
 
 // Consumer routes (public, no auth)
 routes.route("/ai", aiRouter);
 
 export default routes;
+
+// Also export individual routers for testing
+export {
+  keysRouter,
+  projectsRouter,
+  endpointsRouter,
+  analyticsRouter,
+  aiRouter,
+};

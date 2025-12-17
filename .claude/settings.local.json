@@ -9,7 +9,9 @@
       "Bash(bun test:*)",
       "Bash(bun run lint:*)",
       "Bash(bun run format:check:*)",
-      "Bash(bun run format:*)"
+      "Bash(bun run format:*)",
+      "Bash(chmod:*)",
+      "Bash(/Users/johnhuang/shapeshyft/shapeshyft_api/scripts/setup-test-db.sh)"
     ]
   }
 }

@@ -7,13 +7,9 @@ import {
   projectUpdateSchema,
   projectIdParamSchema,
 } from "../schemas";
-import { firebaseAuthMiddleware } from "../middleware/firebaseAuth";
 import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
 
 const projectsRouter = new Hono();
-
-// Apply Firebase auth to all routes
-projectsRouter.use("*", firebaseAuthMiddleware);
 
 /**
  * Helper to get or create user by Firebase UID

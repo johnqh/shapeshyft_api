@@ -3,7 +3,6 @@ import { zValidator } from "@hono/zod-validator";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { db, users, projects, endpoints, usageAnalytics } from "../db";
 import { userIdParamSchema, analyticsQuerySchema } from "../schemas";
-import { firebaseAuthMiddleware } from "../middleware/firebaseAuth";
 import {
   successResponse,
   errorResponse,
@@ -12,9 +11,6 @@ import {
 } from "@sudobility/shapeshyft_types";
 
 const analyticsRouter = new Hono();
-
-// Apply Firebase auth to all routes
-analyticsRouter.use("*", firebaseAuthMiddleware);
 
 /**
  * Helper to get user by Firebase UID

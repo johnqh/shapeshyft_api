@@ -1,8 +1,8 @@
 import type {
-  JsonSchema,
   LlmProvider,
   PromptInput,
   ApiHelperRequestOutput,
+  ApiHelperRequestInput,
 } from "@sudobility/shapeshyft_types";
 import {
   buildSystemPrompt,
@@ -16,24 +16,14 @@ import {
   createLLMProvider,
   PROVIDER_ENDPOINTS,
   type LLMRequest,
-  type ProviderConfig,
 } from "../services/llm";
 
 // Re-export types from shared package
-export type { PromptInput, ApiHelperRequestOutput } from "@sudobility/shapeshyft_types";
-
-// Local type that extends the shared type with internal ProviderConfig
-export interface RequestInput {
-  prompt: string;
-  outputSchema: JsonSchema;
-  provider: LlmProvider;
-  providerConfig: ProviderConfig;
-  options?: {
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
-  };
-}
+export type {
+  PromptInput,
+  ApiHelperRequestOutput,
+  ApiHelperRequestInput,
+} from "@sudobility/shapeshyft_types";
 
 // =============================================================================
 // Helper Functions
@@ -139,7 +129,7 @@ export const ApiHelper = {
    * @param input - The request input parameters
    * @returns The API payload ready to send to the provider
    */
-  request(input: RequestInput): ApiHelperRequestOutput {
+  request(input: ApiHelperRequestInput): ApiHelperRequestOutput {
     const provider = createLLMProvider(input.provider, input.providerConfig);
 
     // Build prompts in the format expected by buildApiPayload

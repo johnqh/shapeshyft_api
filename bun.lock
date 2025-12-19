@@ -7,7 +7,7 @@
         "@anthropic-ai/sdk": "^0.39.0",
         "@google/generative-ai": "^0.21.0",
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/shapeshyft_types": "^1.0.1",
+        "@sudobility/shapeshyft_types": "^1.0.2",
         "@sudobility/types": "^1.9.31",
         "drizzle-orm": "^0.45.0",
         "firebase-admin": "^13.6.0",
@@ -182,7 +182,7 @@
 
     "@rtsao/scc": ["@rtsao/scc@1.1.0", "", {}, "sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g=="],
 
-    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.1", "", { "peerDependencies": { "@sudobility/types": "^1.0.0" } }, "sha512-RYmMUfi3xA7/bdrZ/R+mTAZsxeWo8UWdmVVtC+0Bk/okXzahS3yOzlE04oSsVRoQi1iU0p4MWKk3h4111+eubw=="],
+    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.2", "", { "peerDependencies": { "@sudobility/types": "^1.0.0" } }, "sha512-gjIhVPnrRZwxBoe9m2n/0OtysX0n3fNe34E+xGFP8fXk8HyGOVrWuLTzRUZxH0YQCir72Cybz9DdHuoVWGiQIg=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.31", "", {}, "sha512-3wZw/QvNxvNZTVSygk3vdx3bAn0QKjnBSqjS1tnXlfnZa4uyaTfy9We79rPnKjyk2gpANskIKOUZztEBrqEmTw=="],
 

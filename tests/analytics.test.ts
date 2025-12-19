@@ -45,7 +45,6 @@ describe("Analytics Routes", () => {
         body: {
           endpoint_name: "test-endpoint",
           display_name: "Test Endpoint",
-          endpoint_type: "structured_in_structured_out",
           llm_key_id: keyId,
         },
       }
@@ -124,7 +123,6 @@ describe("Analytics Routes", () => {
           body: {
             endpoint_name: "second-endpoint",
             display_name: "Second Endpoint",
-            endpoint_type: "text_in_structured_out",
             llm_key_id: keyId,
           },
         }
@@ -184,7 +182,6 @@ describe("Analytics Routes", () => {
           body: {
             endpoint_name: "second-endpoint",
             display_name: "Second Endpoint",
-            endpoint_type: "text_in_structured_out",
             llm_key_id: keyId,
           },
         }

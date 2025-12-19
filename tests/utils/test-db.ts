@@ -137,10 +137,10 @@ export async function createTestEndpoint(
     endpoint_name: string;
     display_name: string;
     http_method?: "GET" | "POST";
-    endpoint_type: "structured_in_structured_out" | "text_in_structured_out" | "structured_in_api_out" | "text_in_api_out";
     input_schema?: object;
     output_schema?: object;
     description?: string;
+    context?: string;
   }
 ) {
   const rows = await db
@@ -151,10 +151,10 @@ export async function createTestEndpoint(
       endpoint_name: data.endpoint_name,
       display_name: data.display_name,
       http_method: data.http_method ?? "POST",
-      endpoint_type: data.endpoint_type,
       input_schema: data.input_schema ?? null,
       output_schema: data.output_schema ?? null,
       description: data.description ?? null,
+      context: data.context ?? null,
     })
     .returning();
 

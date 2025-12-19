@@ -114,7 +114,7 @@ export function generateSchemaExample(schema: JsonSchema): unknown {
 /**
  * Check if schema is complex enough to need an example
  */
-function isComplexSchema(schema: JsonSchema): boolean {
+export function isComplexSchema(schema: JsonSchema): boolean {
   if (!schema.properties) return false;
   const properties = Object.values(schema.properties);
   if (properties.length > 3) return true;
@@ -189,7 +189,7 @@ export function buildUserPrompt(
 /**
  * Format structured input data for the prompt
  */
-function formatStructuredInput(data: Record<string, unknown>): string {
+export function formatStructuredInput(data: Record<string, unknown>): string {
   const lines: string[] = [];
 
   for (const [key, value] of Object.entries(data)) {

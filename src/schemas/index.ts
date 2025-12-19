@@ -54,13 +54,6 @@ export const llmProviderSchema = z.enum([
 
 export const httpMethodSchema = z.enum(["GET", "POST"]);
 
-export const endpointTypeSchema = z.enum([
-  "structured_in_structured_out",
-  "text_in_structured_out",
-  "structured_in_api_out",
-  "text_in_api_out",
-]);
-
 // =============================================================================
 // JSON Schema (simplified validation)
 // =============================================================================
@@ -154,7 +147,6 @@ export const endpointCreateSchema = z.object({
     ),
   display_name: z.string().min(1).max(255),
   http_method: httpMethodSchema.optional().default("POST"),
-  endpoint_type: endpointTypeSchema,
   llm_key_id: z.string().uuid(),
   input_schema: jsonSchemaSchema.optional(),
   output_schema: jsonSchemaSchema.optional(),
@@ -166,7 +158,6 @@ export const endpointUpdateSchema = z.object({
   endpoint_name: z.string().min(1).max(255).regex(endpointNameRegex).optional(),
   display_name: z.string().min(1).max(255).optional(),
   http_method: httpMethodSchema.optional(),
-  endpoint_type: endpointTypeSchema.optional(),
   llm_key_id: z.string().uuid().optional(),
   input_schema: jsonSchemaSchema.optional(),
   output_schema: jsonSchemaSchema.optional(),

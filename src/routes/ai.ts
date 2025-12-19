@@ -7,45 +7,46 @@ import {
   successResponse,
   errorResponse,
   type JsonSchema,
-  type EndpointType,
 } from "@sudobility/shapeshyft_types";
 import { decryptApiKey } from "../lib/encryption";
-import { buildPrompts } from "../lib/prompt-builder";
+import { ApiHelper } from "../lib/api-helper";
 import {
   createLLMProvider,
   estimateCost,
-  PROVIDER_ENDPOINTS,
   type LLMRequest,
 } from "../services/llm";
 
 const aiRouter = new Hono();
 
-/**
- * Determine if endpoint type uses structured input
- */
-function isStructuredInput(endpointType: EndpointType): boolean {
-  return (
-    endpointType === "structured_in_structured_out" ||
-    endpointType === "structured_in_api_out"
-  );
+// =============================================================================
+// Types
+// =============================================================================
+
+interface ValidatedContext {
+  success: true;
+  project: typeof projects.$inferSelect;
+  endpoint: typeof endpoints.$inferSelect;
+  llmKey: typeof llmApiKeys.$inferSelect;
+  inputData: unknown;
 }
 
-/**
- * Determine if endpoint type calls the LLM (vs just generating payload)
- */
-function callsLLM(endpointType: EndpointType): boolean {
-  return (
-    endpointType === "structured_in_structured_out" ||
-    endpointType === "text_in_structured_out"
-  );
+interface ValidationError {
+  success: false;
+  response: Response;
 }
 
+type ValidationResult = ValidatedContext | ValidationError;
+
+// =============================================================================
+// Shared Validation Logic
+// =============================================================================
+
 /**
- * Handle AI endpoint execution - shared logic for GET and POST
+ * Validate request and get all required context data.
+ * This is shared between /prompt and main endpoints.
  */
-async function handleAIRequest(c: any) {
+async function validateAndGetContext(c: any): Promise<ValidationResult> {
   const { projectName, endpointName } = c.req.valid("param");
-  const startTime = Date.now();
 
   // 1. Find project by name
   const projectRows = await db
@@ -56,7 +57,10 @@ async function handleAIRequest(c: any) {
     );
 
   if (projectRows.length === 0) {
-    return c.json(errorResponse("Project not found"), 404);
+    return {
+      success: false,
+      response: c.json(errorResponse("Project not found"), 404),
+    };
   }
   const project = projectRows[0]!;
 
@@ -73,19 +77,25 @@ async function handleAIRequest(c: any) {
     );
 
   if (endpointRows.length === 0) {
-    return c.json(errorResponse("Endpoint not found"), 404);
+    return {
+      success: false,
+      response: c.json(errorResponse("Endpoint not found"), 404),
+    };
   }
   const endpoint = endpointRows[0]!;
 
   // 3. Validate HTTP method matches endpoint definition
   const requestMethod = c.req.method;
   if (endpoint.http_method !== requestMethod) {
-    return c.json(
-      errorResponse(
-        `Method ${requestMethod} not allowed. Use ${endpoint.http_method}`
+    return {
+      success: false,
+      response: c.json(
+        errorResponse(
+          `Method ${requestMethod} not allowed. Use ${endpoint.http_method}`
+        ),
+        405
       ),
-      405
-    );
+    };
   }
 
   // 4. Get input data based on method
@@ -98,26 +108,12 @@ async function handleAIRequest(c: any) {
     } else {
       // Parse JSON body
       inputData = await c.req.json();
-
-      // For text_in types, extract text from body
-      if (
-        endpoint.endpoint_type === "text_in_structured_out" ||
-        endpoint.endpoint_type === "text_in_api_out"
-      ) {
-        const body = inputData as Record<string, unknown>;
-        if (typeof body.text !== "string") {
-          return c.json(
-            errorResponse(
-              'Request body must have a "text" field for text input endpoints'
-            ),
-            400
-          );
-        }
-        inputData = body.text;
-      }
     }
   } catch {
-    return c.json(errorResponse("Invalid request body"), 400);
+    return {
+      success: false,
+      response: c.json(errorResponse("Invalid request body"), 400),
+    };
   }
 
   // 5. Get LLM API key
@@ -132,64 +128,87 @@ async function handleAIRequest(c: any) {
     );
 
   if (keyRows.length === 0) {
-    return c.json(errorResponse("LLM API key not found or inactive"), 500);
+    return {
+      success: false,
+      response: c.json(errorResponse("LLM API key not found or inactive"), 500),
+    };
   }
   const llmKey = keyRows[0]!;
 
-  // 6. Build prompts
-  const prompts = buildPrompts(
+  return {
+    success: true,
+    project,
+    endpoint,
+    llmKey,
     inputData,
-    endpoint.output_schema as JsonSchema | null,
-    endpoint.description,
-    isStructuredInput(endpoint.endpoint_type)
-  );
+  };
+}
 
-  // 7. Create LLM request
+// =============================================================================
+// Prompt Endpoint Handler
+// =============================================================================
+
+/**
+ * Handle prompt generation request - returns just the prompt without calling LLM
+ */
+async function handlePromptRequest(c: any) {
+  const context = await validateAndGetContext(c);
+  if (!context.success) {
+    return context.response;
+  }
+
+  const { endpoint, llmKey, inputData } = context;
+
+  // Generate the combined prompt using ApiHelper
+  const prompt = ApiHelper.prompt({
+    inputData,
+    outputSchema: endpoint.output_schema as JsonSchema | null,
+    description: endpoint.description,
+    context: endpoint.context,
+    provider: llmKey.provider,
+  });
+
+  return c.json(
+    successResponse({
+      prompt,
+    })
+  );
+}
+
+// =============================================================================
+// Main AI Endpoint Handler
+// =============================================================================
+
+/**
+ * Handle AI endpoint execution - generates prompt, calls LLM, returns response
+ */
+async function handleAIRequest(c: any) {
+  const startTime = Date.now();
+
+  const context = await validateAndGetContext(c);
+  if (!context.success) {
+    return context.response;
+  }
+
+  const { endpoint, llmKey, inputData } = context;
+
+  // Build the prompts for LLM call (providers expect system/user format)
+  const prompts = ApiHelper.buildLegacyPrompts({
+    inputData,
+    outputSchema: endpoint.output_schema as JsonSchema | null,
+    description: endpoint.description,
+    context: endpoint.context,
+    provider: llmKey.provider,
+  });
+
+  // Create LLM request
   const llmRequest: LLMRequest = {
     prompt: prompts.user,
     systemPrompt: prompts.system,
     outputSchema: (endpoint.output_schema as JsonSchema) ?? { type: "object" },
   };
 
-  // 8. Check if we should call LLM or just return payload
-  if (!callsLLM(endpoint.endpoint_type)) {
-    // Type 3 or Type 4: Return API payload without calling LLM
-    try {
-      // Decrypt API key if needed
-      let apiKey: string | undefined;
-      if (llmKey.encrypted_api_key && llmKey.encryption_iv) {
-        apiKey = decryptApiKey(llmKey.encrypted_api_key, llmKey.encryption_iv);
-      }
-
-      const provider = createLLMProvider(llmKey.provider, {
-        apiKey,
-        endpointUrl: llmKey.endpoint_url ?? undefined,
-      });
-
-      const payload = provider.buildApiPayload(llmRequest);
-      const endpointHint =
-        llmKey.provider === "llm_server"
-          ? llmKey.endpoint_url
-          : PROVIDER_ENDPOINTS[llmKey.provider];
-
-      return c.json(
-        successResponse({
-          api_payload: payload,
-          provider: llmKey.provider,
-          endpoint_hint: endpointHint,
-        })
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json(
-        errorResponse(`Failed to build API payload: ${errorMessage}`),
-        500
-      );
-    }
-  }
-
-  // 9. Type 1 or Type 2: Call LLM and return response
+  // 4. Call LLM and return response
   try {
     // Decrypt API key
     let apiKey: string | undefined;
@@ -204,28 +223,28 @@ async function handleAIRequest(c: any) {
 
     const llmResponse = await provider.generate(llmRequest);
 
-    // 10. Calculate cost
+    // 5. Calculate cost
     const costCents = estimateCost(
       llmResponse.model,
       llmResponse.usage.promptTokens,
       llmResponse.usage.completionTokens
     );
 
-    // 11. Log analytics
+    // 6. Log analytics
     await db.insert(usageAnalytics).values({
       endpoint_id: endpoint.uuid,
       success: true,
       tokens_input: llmResponse.usage.promptTokens,
       tokens_output: llmResponse.usage.completionTokens,
       latency_ms: llmResponse.latencyMs,
-      estimated_cost_cents: Math.round(costCents * 100), // Convert to integer cents
+      estimated_cost_cents: Math.round(costCents * 100),
       request_metadata: {
         model: llmResponse.model,
         provider: llmResponse.provider,
       },
     });
 
-    // 12. Return response
+    // 7. Return response
     return c.json(
       successResponse({
         output: llmResponse.content,
@@ -254,14 +273,33 @@ async function handleAIRequest(c: any) {
   }
 }
 
-// GET endpoint
+// =============================================================================
+// Route Registration
+// =============================================================================
+
+// IMPORTANT: Register /prompt routes BEFORE the main routes
+// Otherwise ":endpointName" will match "prompt" as the endpoint name
+
+// Prompt-only endpoints (new)
+aiRouter.get(
+  "/:projectName/:endpointName/prompt",
+  zValidator("param", aiParamSchema),
+  handlePromptRequest
+);
+
+aiRouter.post(
+  "/:projectName/:endpointName/prompt",
+  zValidator("param", aiParamSchema),
+  handlePromptRequest
+);
+
+// Main AI execution endpoints
 aiRouter.get(
   "/:projectName/:endpointName",
   zValidator("param", aiParamSchema),
   handleAIRequest
 );
 
-// POST endpoint
 aiRouter.post(
   "/:projectName/:endpointName",
   zValidator("param", aiParamSchema),

@@ -27,13 +27,6 @@ export const llmProviderEnum = pgEnum("llm_provider", [
 
 export const httpMethodEnum = pgEnum("http_method", ["GET", "POST"]);
 
-export const endpointTypeEnum = pgEnum("endpoint_type", [
-  "structured_in_structured_out",
-  "text_in_structured_out",
-  "structured_in_api_out",
-  "text_in_api_out",
-]);
-
 // =============================================================================
 // Users Table
 // =============================================================================
@@ -106,7 +99,6 @@ export const endpoints = shapeshyftSchema.table(
     endpoint_name: varchar("endpoint_name", { length: 255 }).notNull(),
     display_name: varchar("display_name", { length: 255 }).notNull(),
     http_method: httpMethodEnum("http_method").notNull().default("POST"),
-    endpoint_type: endpointTypeEnum("endpoint_type").notNull(),
     llm_key_id: uuid("llm_key_id")
       .notNull()
       .references(() => llmApiKeys.uuid, { onDelete: "restrict" }),

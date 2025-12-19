@@ -65,7 +65,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "extract-data",
             display_name: "Extract Data",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
           },
         }
@@ -85,7 +84,7 @@ describe("Endpoints Routes", () => {
   });
 
   describe("POST /api/v1/users/:userId/projects/:projectId/endpoints", () => {
-    it("should create structured_in_structured_out endpoint", async () => {
+    it("should create endpoint with schemas", async () => {
       const res = await createTestRequest(
         app,
         "POST",
@@ -94,7 +93,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "extract-person",
             display_name: "Extract Person",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
             http_method: "POST",
             input_schema: {
@@ -120,36 +118,7 @@ describe("Endpoints Routes", () => {
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(json.data.endpoint_name).toBe("extract-person");
-      expect(json.data.endpoint_type).toBe("structured_in_structured_out");
       expect(json.data.http_method).toBe("POST");
-    });
-
-    it("should create text_in_structured_out endpoint", async () => {
-      const res = await createTestRequest(
-        app,
-        "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
-        {
-          body: {
-            endpoint_name: "classify-sentiment",
-            display_name: "Classify Sentiment",
-            endpoint_type: "text_in_structured_out",
-            llm_key_id: keyId,
-            output_schema: {
-              type: "object",
-              properties: {
-                sentiment: { type: "string", enum: ["positive", "negative", "neutral"] },
-                confidence: { type: "number" },
-              },
-            },
-          },
-        }
-      );
-
-      expect(res.status).toBe(201);
-
-      const json = await res.json();
-      expect(json.data.endpoint_type).toBe("text_in_structured_out");
     });
 
     it("should create GET endpoint", async () => {
@@ -161,7 +130,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "get-info",
             display_name: "Get Info",
-            endpoint_type: "structured_in_api_out",
             llm_key_id: keyId,
             http_method: "GET",
           },
@@ -184,7 +152,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "unique-endpoint",
             display_name: "First Endpoint",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
           },
         }
@@ -199,31 +166,12 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "unique-endpoint",
             display_name: "Second Endpoint",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
           },
         }
       );
 
       expect(res.status).toBe(409);
-    });
-
-    it("should reject invalid endpoint_type", async () => {
-      const res = await createTestRequest(
-        app,
-        "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
-        {
-          body: {
-            endpoint_name: "invalid-type",
-            display_name: "Invalid Type",
-            endpoint_type: "invalid_type",
-            llm_key_id: keyId,
-          },
-        }
-      );
-
-      expect(res.status).toBe(400);
     });
 
     it("should reject missing llm_key_id", async () => {
@@ -235,7 +183,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "no-key",
             display_name: "No Key",
-            endpoint_type: "structured_in_structured_out",
           },
         }
       );
@@ -252,7 +199,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "bad-key",
             display_name: "Bad Key",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: "00000000-0000-0000-0000-000000000000",
           },
         }
@@ -274,7 +220,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "test-endpoint",
             display_name: "Test Endpoint",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
           },
         }
@@ -315,7 +260,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "test-endpoint",
             display_name: "Original Name",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
           },
         }
@@ -350,7 +294,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "test-endpoint",
             display_name: "Test Endpoint",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
           },
         }
@@ -392,7 +335,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "test-endpoint",
             display_name: "Test Endpoint",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
           },
         }
@@ -429,7 +371,6 @@ describe("Endpoints Routes", () => {
           body: {
             endpoint_name: "test-endpoint",
             display_name: "Test Endpoint",
-            endpoint_type: "structured_in_structured_out",
             llm_key_id: keyId,
           },
         }

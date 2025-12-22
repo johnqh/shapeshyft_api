@@ -9,6 +9,10 @@ import aiRouter from "./ai";
 
 const routes = new Hono();
 
+// Consumer routes (public, no auth) - MUST be registered before admin routes
+// to avoid wildcard middleware interception
+routes.route("/ai", aiRouter);
+
 // Admin routes (Firebase auth required)
 const adminRoutes = new Hono();
 adminRoutes.use("*", firebaseAuthMiddleware);
@@ -21,9 +25,6 @@ adminRoutes.route(
 adminRoutes.route("/users/:userId/analytics", analyticsRouter);
 adminRoutes.route("/users/:userId/settings", settingsRouter);
 routes.route("/", adminRoutes);
-
-// Consumer routes (public, no auth)
-routes.route("/ai", aiRouter);
 
 export default routes;
 

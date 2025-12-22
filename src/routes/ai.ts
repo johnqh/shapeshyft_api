@@ -264,18 +264,29 @@ async function handleAIRequest(c: any) {
   };
 
   // 4. Call LLM and return response
+  // Decrypt API key
+  let apiKey: string | undefined;
+  if (llmKey.encrypted_api_key && llmKey.encryption_iv) {
+    apiKey = decryptApiKey(llmKey.encrypted_api_key, llmKey.encryption_iv);
+  }
+
+  const provider = createLLMProvider(llmKey.provider, {
+    apiKey,
+    endpointUrl: llmKey.endpoint_url ?? undefined,
+  });
+
+  // Debug info for troubleshooting (get actual URL from provider if available)
+  const actualEndpointUrl =
+    "getEndpointUrl" in provider
+      ? (provider as { getEndpointUrl: () => string }).getEndpointUrl()
+      : llmKey.endpoint_url;
+  const debugInfo = {
+    provider: llmKey.provider,
+    endpointUrl: actualEndpointUrl,
+    request: llmRequest,
+  };
+
   try {
-    // Decrypt API key
-    let apiKey: string | undefined;
-    if (llmKey.encrypted_api_key && llmKey.encryption_iv) {
-      apiKey = decryptApiKey(llmKey.encrypted_api_key, llmKey.encryption_iv);
-    }
-
-    const provider = createLLMProvider(llmKey.provider, {
-      apiKey,
-      endpointUrl: llmKey.endpoint_url ?? undefined,
-    });
-
     const llmResponse = await provider.generate(llmRequest);
 
     // 5. Calculate cost
@@ -324,7 +335,15 @@ async function handleAIRequest(c: any) {
       latency_ms: latencyMs,
     });
 
-    return c.json(errorResponse(`LLM processing failed: ${errorMessage}`), 500);
+    return c.json(
+      {
+        success: false,
+        error: `LLM processing failed: ${errorMessage}`,
+        debug: debugInfo,
+        timestamp: new Date().toISOString(),
+      },
+      500
+    );
   }
 }
 

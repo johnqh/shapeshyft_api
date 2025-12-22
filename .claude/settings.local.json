@@ -11,7 +11,26 @@
       "Bash(bun run format:check:*)",
       "Bash(bun run format:*)",
       "Bash(chmod:*)",
-      "Bash(/Users/johnhuang/shapeshyft/shapeshyft_api/scripts/setup-test-db.sh)"
+      "Bash(/Users/johnhuang/shapeshyft/shapeshyft_api/scripts/setup-test-db.sh)",
+      "Bash(grep:*)",
+      "Bash(bunx tsc:*)",
+      "Bash(cat:*)",
+      "Bash(npm view:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(psql $DATABASE_URL -c \"ALTER TABLE shapeshyft.endpoints DROP COLUMN IF EXISTS endpoint_type;\")",
+      "Bash(psql:*)",
+      "Bash(bun add:*)",
+      "Bash(openssl rand:*)",
+      "Bash(curl:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx eslint:*)",
+      "Bash(npx prettier --check src)",
+      "Bash(npm test)",
+      "Bash(bun run verify:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ]
   }
 }

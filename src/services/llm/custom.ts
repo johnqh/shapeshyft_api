@@ -18,7 +18,14 @@ export class CustomLLMProvider implements ILLMProvider {
     if (!config.endpointUrl) {
       throw new Error("LLM Server endpoint URL is required");
     }
-    this.endpointUrl = config.endpointUrl;
+    // Auto-append /chat/completions for OpenAI-compatible endpoints
+    let url = config.endpointUrl;
+    if (url.endsWith("/v1")) {
+      url = url + "/chat/completions";
+    } else if (url.endsWith("/v1/")) {
+      url = url + "chat/completions";
+    }
+    this.endpointUrl = url;
     this.timeout = 120_000; // 2 minutes
   }
 
@@ -27,14 +34,23 @@ export class CustomLLMProvider implements ILLMProvider {
 
     const payload = this.buildApiPayload(request);
 
-    const response = await fetch(this.endpointUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(this.timeout),
-    });
+    let response: Response;
+    try {
+      response = await fetch(this.endpointUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(this.timeout),
+      });
+    } catch (fetchError) {
+      const errorMsg =
+        fetchError instanceof Error ? fetchError.message : String(fetchError);
+      throw new Error(
+        `Failed to connect to LLM Server at ${this.endpointUrl}: ${errorMsg}`
+      );
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -72,7 +88,11 @@ export class CustomLLMProvider implements ILLMProvider {
       const choice = result.choices[0] as Record<string, unknown>;
       const message = choice.message as Record<string, unknown> | undefined;
 
-      if (message?.tool_calls && Array.isArray(message.tool_calls)) {
+      if (
+        message?.tool_calls &&
+        Array.isArray(message.tool_calls) &&
+        message.tool_calls.length > 0
+      ) {
         const toolCall = message.tool_calls[0] as Record<string, unknown>;
         const func = toolCall.function as Record<string, unknown>;
         rawResponse = func.arguments as string;
@@ -182,25 +202,19 @@ export class CustomLLMProvider implements ILLMProvider {
     }
     messages.push({ role: "user", content: request.prompt });
 
+    // Use simple payload for custom LLM servers - rely on system prompt for JSON formatting
+    // Many servers don't support response_format or tools
     return {
       messages,
       temperature: request.temperature ?? 0,
       max_tokens: request.maxTokens,
-      response_format: { type: "json_object" },
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "structured_response",
-            description: "Generate structured response matching the schema",
-            parameters: request.outputSchema,
-          },
-        },
-      ],
-      tool_choice: {
-        type: "function",
-        function: { name: "structured_response" },
-      },
     };
+  }
+
+  /**
+   * Get the actual endpoint URL (after auto-append)
+   */
+  getEndpointUrl(): string {
+    return this.endpointUrl;
   }
 }

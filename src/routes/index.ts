@@ -4,6 +4,7 @@ import keysRouter from "./keys";
 import projectsRouter from "./projects";
 import endpointsRouter from "./endpoints";
 import analyticsRouter from "./analytics";
+import settingsRouter from "./settings";
 import aiRouter from "./ai";
 
 const routes = new Hono();
@@ -18,6 +19,7 @@ adminRoutes.route(
   endpointsRouter
 );
 adminRoutes.route("/users/:userId/analytics", analyticsRouter);
+adminRoutes.route("/users/:userId/settings", settingsRouter);
 routes.route("/", adminRoutes);
 
 // Consumer routes (public, no auth)
@@ -31,5 +33,6 @@ export {
   projectsRouter,
   endpointsRouter,
   analyticsRouter,
+  settingsRouter,
   aiRouter,
 };

@@ -1,4 +1,12 @@
-import { db, users, llmApiKeys, projects, endpoints, usageAnalytics } from "../../src/db";
+import {
+  db,
+  users,
+  userSettings,
+  llmApiKeys,
+  projects,
+  endpoints,
+  usageAnalytics,
+} from "../../src/db";
 import { eq } from "drizzle-orm";
 import type { MockFirebaseUser } from "./mock-auth";
 
@@ -42,9 +50,28 @@ export async function cleanupTestUser(firebaseUid: string) {
     // Delete LLM keys
     await db.delete(llmApiKeys).where(eq(llmApiKeys.user_id, user.uuid));
 
+    // Delete user settings
+    await db.delete(userSettings).where(eq(userSettings.user_id, user.uuid));
+
     // Delete user
     await db.delete(users).where(eq(users.uuid, user.uuid));
   }
+}
+
+/**
+ * Get user UUID by firebase UID
+ */
+export async function getUserUuid(firebaseUid: string): Promise<string> {
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.firebase_uid, firebaseUid));
+
+  if (rows.length === 0) {
+    throw new Error(`User not found for firebase UID: ${firebaseUid}`);
+  }
+
+  return rows[0]!.uuid;
 }
 
 /**

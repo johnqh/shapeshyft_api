@@ -55,6 +55,17 @@ export async function initDatabase() {
   `;
 
   await client`
+    CREATE TABLE IF NOT EXISTS shapeshyft.user_settings (
+      uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL UNIQUE REFERENCES shapeshyft.users(uuid) ON DELETE CASCADE,
+      organization_name VARCHAR(255),
+      organization_path VARCHAR(255) NOT NULL UNIQUE,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
+  await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.llm_api_keys (
       uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL REFERENCES shapeshyft.users(uuid) ON DELETE CASCADE,
@@ -90,7 +101,6 @@ export async function initDatabase() {
       endpoint_name VARCHAR(255) NOT NULL,
       display_name VARCHAR(255) NOT NULL,
       http_method shapeshyft.http_method NOT NULL DEFAULT 'POST',
-      endpoint_type shapeshyft.endpoint_type NOT NULL,
       llm_key_id UUID NOT NULL REFERENCES shapeshyft.llm_api_keys(uuid) ON DELETE RESTRICT,
       input_schema JSONB,
       output_schema JSONB,
@@ -107,6 +117,12 @@ export async function initDatabase() {
   await client`
     ALTER TABLE shapeshyft.endpoints
     ADD COLUMN IF NOT EXISTS context TEXT
+  `;
+
+  // Migration: Drop endpoint_type column if it exists (no longer used)
+  await client`
+    ALTER TABLE shapeshyft.endpoints
+    DROP COLUMN IF EXISTS endpoint_type
   `;
 
   await client`

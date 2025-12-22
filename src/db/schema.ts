@@ -41,6 +41,24 @@ export const users = shapeshyftSchema.table("users", {
 });
 
 // =============================================================================
+// User Settings Table
+// =============================================================================
+
+export const userSettings = shapeshyftSchema.table("user_settings", {
+  uuid: uuid("uuid").primaryKey().defaultRandom(),
+  user_id: uuid("user_id")
+    .notNull()
+    .references(() => users.uuid, { onDelete: "cascade" })
+    .unique(),
+  organization_name: varchar("organization_name", { length: 255 }),
+  organization_path: varchar("organization_path", { length: 255 })
+    .notNull()
+    .unique(),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow(),
+});
+
+// =============================================================================
 // LLM API Keys Table
 // =============================================================================
 

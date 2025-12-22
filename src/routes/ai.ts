@@ -1,7 +1,15 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and } from "drizzle-orm";
-import { db, projects, endpoints, llmApiKeys, usageAnalytics } from "../db";
+import { eq, and, sql } from "drizzle-orm";
+import {
+  db,
+  users,
+  userSettings,
+  projects,
+  endpoints,
+  llmApiKeys,
+  usageAnalytics,
+} from "../db";
 import { aiParamSchema } from "../schemas";
 import {
   successResponse,
@@ -42,18 +50,65 @@ type ValidationResult = ValidatedContext | ValidationError;
 // =============================================================================
 
 /**
+ * Find user by organization path.
+ * First checks user_settings table, then falls back to UUID prefix matching.
+ */
+async function findUserByOrgPath(
+  organizationPath: string
+): Promise<typeof users.$inferSelect | null> {
+  // 1. Check user_settings for explicit organization_path
+  const settingsRows = await db
+    .select()
+    .from(userSettings)
+    .where(eq(userSettings.organization_path, organizationPath));
+
+  if (settingsRows.length > 0) {
+    const userRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.uuid, settingsRows[0]!.user_id));
+    return userRows[0] ?? null;
+  }
+
+  // 2. Fallback: check if organizationPath matches first 8 chars of any user UUID
+  // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  // We need to match where uuid starts with the org path (without hyphens)
+  const userRows = await db
+    .select()
+    .from(users)
+    .where(
+      sql`REPLACE(${users.uuid}::text, '-', '') LIKE ${organizationPath + "%"}`
+    );
+
+  return userRows[0] ?? null;
+}
+
+/**
  * Validate request and get all required context data.
  * This is shared between /prompt and main endpoints.
  */
 async function validateAndGetContext(c: any): Promise<ValidationResult> {
-  const { projectName, endpointName } = c.req.valid("param");
+  const { organizationPath, projectName, endpointName } = c.req.valid("param");
 
-  // 1. Find project by name
+  // 1. Find user by organization path
+  const user = await findUserByOrgPath(organizationPath);
+  if (!user) {
+    return {
+      success: false,
+      response: c.json(errorResponse("Organization not found"), 404),
+    };
+  }
+
+  // 2. Find project by name AND user_id
   const projectRows = await db
     .select()
     .from(projects)
     .where(
-      and(eq(projects.project_name, projectName), eq(projects.is_active, true))
+      and(
+        eq(projects.user_id, user.uuid),
+        eq(projects.project_name, projectName),
+        eq(projects.is_active, true)
+      )
     );
 
   if (projectRows.length === 0) {
@@ -64,7 +119,7 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
   }
   const project = projectRows[0]!;
 
-  // 2. Find endpoint by name within project
+  // 3. Find endpoint by name within project
   const endpointRows = await db
     .select()
     .from(endpoints)
@@ -84,7 +139,7 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
   }
   const endpoint = endpointRows[0]!;
 
-  // 3. Validate HTTP method matches endpoint definition
+  // 4. Validate HTTP method matches endpoint definition
   const requestMethod = c.req.method;
   if (endpoint.http_method !== requestMethod) {
     return {
@@ -98,7 +153,7 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
     };
   }
 
-  // 4. Get input data based on method
+  // 5. Get input data based on method
   let inputData: unknown;
   try {
     if (requestMethod === "GET") {
@@ -116,7 +171,7 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
     };
   }
 
-  // 5. Get LLM API key
+  // 6. Get LLM API key
   const keyRows = await db
     .select()
     .from(llmApiKeys)
@@ -282,26 +337,26 @@ async function handleAIRequest(c: any) {
 
 // Prompt-only endpoints (new)
 aiRouter.get(
-  "/:projectName/:endpointName/prompt",
+  "/:organizationPath/:projectName/:endpointName/prompt",
   zValidator("param", aiParamSchema),
   handlePromptRequest
 );
 
 aiRouter.post(
-  "/:projectName/:endpointName/prompt",
+  "/:organizationPath/:projectName/:endpointName/prompt",
   zValidator("param", aiParamSchema),
   handlePromptRequest
 );
 
 // Main AI execution endpoints
 aiRouter.get(
-  "/:projectName/:endpointName",
+  "/:organizationPath/:projectName/:endpointName",
   zValidator("param", aiParamSchema),
   handleAIRequest
 );
 
 aiRouter.post(
-  "/:projectName/:endpointName",
+  "/:organizationPath/:projectName/:endpointName",
   zValidator("param", aiParamSchema),
   handleAIRequest
 );

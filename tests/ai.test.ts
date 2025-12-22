@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { createTestApp, createTestRequest, testUser } from "./utils";
-import { cleanupTestUser } from "./utils/test-db";
+import { cleanupTestUser, getUserUuid } from "./utils/test-db";
 import { initDatabase } from "../src/db";
 
 describe("AI Routes", () => {
@@ -9,6 +9,7 @@ describe("AI Routes", () => {
   let projectName: string;
   let keyId: string;
   let projectId: string;
+  let orgPath: string;
 
   beforeAll(async () => {
     await initDatabase();
@@ -37,18 +38,36 @@ describe("AI Routes", () => {
     });
     const projectJson = await projectRes.json();
     projectId = projectJson.data.uuid;
+
+    // Get user UUID to derive organization path
+    const userUuid = await getUserUuid(userId);
+    orgPath = userUuid.replace(/-/g, "").slice(0, 8);
   });
 
   afterAll(async () => {
     await cleanupTestUser(userId);
   });
 
-  describe("GET/POST /api/v1/ai/:projectName/:endpointName", () => {
+  describe("GET/POST /api/v1/ai/:organizationPath/:projectName/:endpointName", () => {
+    it("should return 404 for non-existent organization", async () => {
+      const res = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/ai/nonexist/some-project/some-endpoint`,
+        { body: { text: "test" } }
+      );
+      expect(res.status).toBe(404);
+
+      const json = await res.json();
+      expect(json.success).toBe(false);
+      expect(json.error).toContain("Organization not found");
+    });
+
     it("should return 404 for non-existent project", async () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/non-existent-project/some-endpoint`,
+        `/api/v1/ai/${orgPath}/non-existent-project/some-endpoint`,
         { body: { text: "test" } }
       );
       expect(res.status).toBe(404);
@@ -62,7 +81,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${projectName}/non-existent-endpoint`,
+        `/api/v1/ai/${orgPath}/${projectName}/non-existent-endpoint`,
         { body: { text: "test" } }
       );
       expect(res.status).toBe(404);
@@ -88,7 +107,7 @@ describe("AI Routes", () => {
         }
       );
 
-      const res = await createTestRequest(app, "GET", `/api/v1/ai/${projectName}/post-only`);
+      const res = await createTestRequest(app, "GET", `/api/v1/ai/${orgPath}/${projectName}/post-only`);
       expect(res.status).toBe(405);
 
       const json = await res.json();
@@ -128,7 +147,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${projectName}/to-deactivate`,
+        `/api/v1/ai/${orgPath}/${projectName}/to-deactivate`,
         {
           body: { data: "test" },
         }
@@ -163,7 +182,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${projectName}/test-endpoint`,
+        `/api/v1/ai/${orgPath}/${projectName}/test-endpoint`,
         {
           body: { data: "test" },
         }
@@ -173,7 +192,7 @@ describe("AI Routes", () => {
     });
   });
 
-  describe("GET/POST /api/v1/ai/:projectName/:endpointName/prompt", () => {
+  describe("GET/POST /api/v1/ai/:organizationPath/:projectName/:endpointName/prompt", () => {
     it("should return prompt for endpoint", async () => {
       // Create endpoint
       await createTestRequest(
@@ -202,7 +221,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${projectName}/structured-endpoint/prompt`,
+        `/api/v1/ai/${orgPath}/${projectName}/structured-endpoint/prompt`,
         {
           body: {
             name: "John",
@@ -225,7 +244,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${projectName}/non-existent/prompt`,
+        `/api/v1/ai/${orgPath}/${projectName}/non-existent/prompt`,
         { body: { text: "test" } }
       );
       expect(res.status).toBe(404);
@@ -256,7 +275,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${projectName}/openai-endpoint/prompt`,
+        `/api/v1/ai/${orgPath}/${projectName}/openai-endpoint/prompt`,
         {
           body: {
             data: "Test input",
@@ -293,7 +312,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/ai/${projectName}/get-prompt-endpoint/prompt?question=What+is+2+2`
+        `/api/v1/ai/${orgPath}/${projectName}/get-prompt-endpoint/prompt?question=What+is+2+2`
       );
 
       expect(res.status).toBe(200);

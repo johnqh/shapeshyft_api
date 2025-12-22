@@ -29,6 +29,14 @@ export const endpointIdParamSchema = z.object({
 });
 
 export const aiParamSchema = z.object({
+  organizationPath: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(
+      /^[a-zA-Z0-9_]+$/,
+      "Must contain only letters, numbers, and underscores"
+    ),
   projectName: z
     .string()
     .min(1)
@@ -181,4 +189,23 @@ export const analyticsQuerySchema = z.object({
     .optional(),
   project_id: z.string().uuid().optional(),
   endpoint_id: z.string().uuid().optional(),
+});
+
+// =============================================================================
+// Settings Schemas
+// =============================================================================
+
+const organizationPathRegex = /^[a-zA-Z0-9_]+$/;
+
+export const settingsUpdateSchema = z.object({
+  organization_name: z.string().min(1).max(255).optional(),
+  organization_path: z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(
+      organizationPathRegex,
+      "Must contain only letters, numbers, and underscores"
+    )
+    .optional(),
 });

@@ -3,7 +3,11 @@ import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
 import { db, users, userSettings } from "../db";
 import { settingsUpdateSchema } from "../schemas";
-import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
+import {
+  successResponse,
+  errorResponse,
+  type UserSettings,
+} from "@sudobility/shapeshyft_types";
 
 const settingsRouter = new Hono();
 
@@ -57,20 +61,20 @@ settingsRouter.get("/", async c => {
 
   if (rows.length === 0) {
     // Return default settings with auto-generated org path
-    return c.json(
-      successResponse({
-        uuid: null,
-        user_id: user.uuid,
-        organization_name: null,
-        organization_path: generateDefaultOrgPath(user.uuid),
-        is_default: true,
-        created_at: null,
-        updated_at: null,
-      })
-    );
+    const defaultSettings: UserSettings = {
+      uuid: null,
+      user_id: user.uuid,
+      organization_name: null,
+      organization_path: generateDefaultOrgPath(user.uuid),
+      is_default: true,
+      created_at: null,
+      updated_at: null,
+    };
+    return c.json(successResponse(defaultSettings));
   }
 
-  return c.json(successResponse({ ...rows[0], is_default: false }));
+  const settings: UserSettings = { ...rows[0], is_default: false };
+  return c.json(successResponse(settings));
 });
 
 // PUT create/update settings (upsert)
@@ -136,7 +140,8 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
       })
       .returning();
 
-    return c.json(successResponse({ ...rows[0], is_default: false }), 201);
+    const created: UserSettings = { ...rows[0]!, is_default: false };
+    return c.json(successResponse(created), 201);
   }
 
   // Update existing settings
@@ -151,7 +156,8 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
     .where(eq(userSettings.user_id, user.uuid))
     .returning();
 
-  return c.json(successResponse({ ...rows[0], is_default: false }));
+  const updated: UserSettings = { ...rows[0]!, is_default: false };
+  return c.json(successResponse(updated));
 });
 
 export default settingsRouter;

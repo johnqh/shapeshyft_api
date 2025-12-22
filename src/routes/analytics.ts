@@ -8,6 +8,7 @@ import {
   errorResponse,
   type UsageAggregate,
   type UsageByEndpoint,
+  type AnalyticsResponse,
 } from "@sudobility/shapeshyft_types";
 
 const analyticsRouter = new Hono();
@@ -53,21 +54,19 @@ analyticsRouter.get(
       .where(eq(projects.user_id, user.uuid));
 
     if (userProjects.length === 0) {
-      const emptyAggregate: UsageAggregate = {
-        total_requests: 0,
-        successful_requests: 0,
-        failed_requests: 0,
-        total_tokens_input: 0,
-        total_tokens_output: 0,
-        total_estimated_cost_cents: 0,
-        average_latency_ms: 0,
+      const emptyResponse: AnalyticsResponse = {
+        aggregate: {
+          total_requests: 0,
+          successful_requests: 0,
+          failed_requests: 0,
+          total_tokens_input: 0,
+          total_tokens_output: 0,
+          total_estimated_cost_cents: 0,
+          average_latency_ms: 0,
+        },
+        by_endpoint: [],
       };
-      return c.json(
-        successResponse({
-          aggregate: emptyAggregate,
-          by_endpoint: [],
-        })
-      );
+      return c.json(successResponse(emptyResponse));
     }
 
     const projectIds = userProjects.map(p => p.uuid);
@@ -79,21 +78,19 @@ analyticsRouter.get(
       .where(sql`${endpoints.project_id} IN ${projectIds}`);
 
     if (userEndpoints.length === 0) {
-      const emptyAggregate: UsageAggregate = {
-        total_requests: 0,
-        successful_requests: 0,
-        failed_requests: 0,
-        total_tokens_input: 0,
-        total_tokens_output: 0,
-        total_estimated_cost_cents: 0,
-        average_latency_ms: 0,
+      const emptyResponse: AnalyticsResponse = {
+        aggregate: {
+          total_requests: 0,
+          successful_requests: 0,
+          failed_requests: 0,
+          total_tokens_input: 0,
+          total_tokens_output: 0,
+          total_estimated_cost_cents: 0,
+          average_latency_ms: 0,
+        },
+        by_endpoint: [],
       };
-      return c.json(
-        successResponse({
-          aggregate: emptyAggregate,
-          by_endpoint: [],
-        })
-      );
+      return c.json(successResponse(emptyResponse));
     }
 
     const endpointIds = userEndpoints.map(e => e.uuid);
@@ -123,21 +120,19 @@ analyticsRouter.get(
         .filter(e => e.project_id === query.project_id)
         .map(e => e.uuid);
       if (projectEndpoints.length === 0) {
-        const emptyAggregate: UsageAggregate = {
-          total_requests: 0,
-          successful_requests: 0,
-          failed_requests: 0,
-          total_tokens_input: 0,
-          total_tokens_output: 0,
-          total_estimated_cost_cents: 0,
-          average_latency_ms: 0,
+        const emptyResponse: AnalyticsResponse = {
+          aggregate: {
+            total_requests: 0,
+            successful_requests: 0,
+            failed_requests: 0,
+            total_tokens_input: 0,
+            total_tokens_output: 0,
+            total_estimated_cost_cents: 0,
+            average_latency_ms: 0,
+          },
+          by_endpoint: [],
         };
-        return c.json(
-          successResponse({
-            aggregate: emptyAggregate,
-            by_endpoint: [],
-          })
-        );
+        return c.json(successResponse(emptyResponse));
       }
       conditions.push(
         sql`${usageAnalytics.endpoint_id} IN ${projectEndpoints}`
@@ -200,12 +195,12 @@ analyticsRouter.get(
       average_latency_ms: Math.round(Number(row.average_latency_ms)),
     }));
 
-    return c.json(
-      successResponse({
-        aggregate,
-        by_endpoint: byEndpoint,
-      })
-    );
+    const response: AnalyticsResponse = {
+      aggregate,
+      by_endpoint: byEndpoint,
+    };
+
+    return c.json(successResponse(response));
   }
 );
 

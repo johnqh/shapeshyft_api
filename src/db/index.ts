@@ -104,7 +104,7 @@ export async function initDatabase() {
       llm_key_id UUID NOT NULL REFERENCES shapeshyft.llm_api_keys(uuid) ON DELETE RESTRICT,
       input_schema JSONB,
       output_schema JSONB,
-      description TEXT,
+      instructions TEXT,
       context TEXT,
       is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT NOW(),
@@ -123,6 +123,21 @@ export async function initDatabase() {
   await client`
     ALTER TABLE shapeshyft.endpoints
     DROP COLUMN IF EXISTS endpoint_type
+  `;
+
+  // Migration: Rename description column to instructions (if description exists)
+  await client`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'shapeshyft'
+        AND table_name = 'endpoints'
+        AND column_name = 'description'
+      ) THEN
+        ALTER TABLE shapeshyft.endpoints RENAME COLUMN description TO instructions;
+      END IF;
+    END $$;
   `;
 
   await client`

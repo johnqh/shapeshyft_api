@@ -158,7 +158,7 @@ export const endpointCreateSchema = z.object({
   llm_key_id: z.string().uuid(),
   input_schema: jsonSchemaSchema.optional(),
   output_schema: jsonSchemaSchema.optional(),
-  description: z.string().max(10000).optional(),
+  instructions: z.string().max(10000).optional(),
   context: z.string().max(10000).optional(),
 });
 
@@ -169,7 +169,7 @@ export const endpointUpdateSchema = z.object({
   llm_key_id: z.string().uuid().optional(),
   input_schema: jsonSchemaSchema.optional(),
   output_schema: jsonSchemaSchema.optional(),
-  description: z.string().max(10000).optional(),
+  instructions: z.string().max(10000).optional(),
   context: z.string().max(10000).optional(),
   is_active: z.boolean().optional(),
 });

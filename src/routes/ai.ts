@@ -218,7 +218,7 @@ async function handlePromptRequest(c: any) {
   const prompt = ApiHelper.prompt({
     inputData,
     outputSchema: endpoint.output_schema as JsonSchema | null,
-    description: endpoint.description,
+    instructions: endpoint.instructions,
     context: endpoint.context,
     provider: llmKey.provider,
   });
@@ -251,7 +251,7 @@ async function handleAIRequest(c: any) {
   const prompts = ApiHelper.buildLegacyPrompts({
     inputData,
     outputSchema: endpoint.output_schema as JsonSchema | null,
-    description: endpoint.description,
+    instructions: endpoint.instructions,
     context: endpoint.context,
     provider: llmKey.provider,
   });

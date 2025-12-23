@@ -74,9 +74,9 @@ export const ApiHelper = {
       "You are a helpful assistant that produces structured data output."
     );
 
-    // Task description
-    if (input.description) {
-      parts.push(`\n## Task\n${input.description}`);
+    // Task instructions
+    if (input.instructions) {
+      parts.push(`\n## Task\n${input.instructions}`);
     }
 
     // Additional context
@@ -163,7 +163,7 @@ export const ApiHelper = {
    */
   buildLegacyPrompts(input: PromptInput): { system: string; user: string } {
     return {
-      system: buildSystemPrompt(input.description, input.outputSchema),
+      system: buildSystemPrompt(input.instructions, input.outputSchema),
       user: buildUserPrompt(input.inputData, true), // Always structured input
     };
   },

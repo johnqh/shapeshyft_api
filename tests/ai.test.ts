@@ -213,7 +213,7 @@ describe("AI Routes", () => {
               },
               required: ["name"],
             },
-            description: "Extract person details from input data",
+            instructions: "Extract person details from input data",
           },
         }
       );

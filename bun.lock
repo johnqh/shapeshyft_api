@@ -7,7 +7,7 @@
         "@anthropic-ai/sdk": "^0.39.0",
         "@google/generative-ai": "^0.21.0",
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/shapeshyft_types": "^1.0.5",
+        "@sudobility/shapeshyft_types": "^1.0.6",
         "@sudobility/types": "^1.9.31",
         "drizzle-orm": "^0.45.0",
         "firebase-admin": "^13.6.0",
@@ -27,7 +27,7 @@
         "prettier": "^3.7.4",
       },
       "peerDependencies": {
-        "typescript": "^5",
+        "typescript": "^5.9.3",
       },
     },
   },
@@ -132,7 +132,7 @@
 
     "@rtsao/scc": ["@rtsao/scc@1.1.0", "", {}, ""],
 
-    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.5", "", { "peerDependencies": { "@sudobility/types": "^1.0.0" } }, "sha512-TEmXhkdeUyGuXHZHhf7Dj6Pr97JiH2ZXPvq6vqSdtWTexap2hqJys53bpCWlYF0lloJX8OITUcTuJsxR2RYBCw=="],
+    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.6", "", { "peerDependencies": { "@sudobility/types": "^1.9.31" } }, "sha512-imxRX50EVR3f5wEFSy3spbJeuxGKztuRLaA1hLuU5mv/AOxtMaaTSKSkNOoLcVlkTSk8Qygh5exvs4yl9qk4Xw=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.31", "", {}, ""],
 

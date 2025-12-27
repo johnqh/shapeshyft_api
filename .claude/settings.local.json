@@ -30,7 +30,8 @@
       "Bash(bun run verify:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(docker login:*)"
     ]
   }
 }

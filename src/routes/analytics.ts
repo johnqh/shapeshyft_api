@@ -103,7 +103,7 @@ analyticsRouter.get(
 
     if (query.start_date) {
       conditions.push(
-        gte(usageAnalytics.timestamp, new Date(query.start_date))
+        gte(usageAnalytics.timestamp, new Date(query.start_date + "T00:00:00Z"))
       );
     }
     if (query.end_date) {

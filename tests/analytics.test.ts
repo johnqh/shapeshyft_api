@@ -146,15 +146,19 @@ describe("Analytics Routes", () => {
     });
 
     it("should filter by date range", async () => {
-      // Create analytics entries with different timestamps
+      // Get today's date in UTC and create a timestamp at noon UTC
+      const today = new Date().toISOString().split("T")[0];
+      const noonUTC = new Date(today + "T12:00:00Z");
+
+      // Create analytics entry with explicit timestamp at noon UTC
       await createTestUsageAnalytics(endpointId, {
         success: true,
         tokens_input: 100,
         tokens_output: 50,
         latency_ms: 500,
+        timestamp: noonUTC,
       });
 
-      const today = new Date().toISOString().split("T")[0];
       const res = await createTestRequest(
         app,
         "GET",

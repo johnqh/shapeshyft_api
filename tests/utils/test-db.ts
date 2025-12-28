@@ -200,12 +200,14 @@ export async function createTestUsageAnalytics(
     tokens_output?: number;
     latency_ms?: number;
     estimated_cost_cents?: number;
+    timestamp?: Date;
   }
 ) {
   const rows = await db
     .insert(usageAnalytics)
     .values({
       endpoint_id: endpointId,
+      timestamp: data.timestamp ?? new Date(),
       success: data.success,
       error_message: data.error_message ?? null,
       tokens_input: data.tokens_input ?? null,

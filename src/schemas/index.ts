@@ -144,6 +144,14 @@ export const projectUpdateSchema = z.object({
 
 const endpointNameRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
 
+// IPv4 address validation
+const ipv4Regex =
+  /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
+export const ipv4Schema = z.string().regex(ipv4Regex, "Invalid IPv4 address");
+
+export const ipAllowlistSchema = z.array(ipv4Schema).nullable().optional();
+
 export const endpointCreateSchema = z.object({
   endpoint_name: z
     .string()
@@ -172,6 +180,7 @@ export const endpointUpdateSchema = z.object({
   instructions: z.string().max(10000).optional(),
   context: z.string().max(10000).optional(),
   is_active: z.boolean().optional(),
+  ip_allowlist: ipAllowlistSchema,
 });
 
 // =============================================================================

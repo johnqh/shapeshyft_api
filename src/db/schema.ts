@@ -10,6 +10,7 @@ import {
   jsonb,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { createRateLimitCountersTable } from "@sudobility/ratelimit_service";
 
 // Create the shapeshyft schema
 export const shapeshyftSchema = pgSchema("shapeshyft");
@@ -92,6 +93,11 @@ export const projects = shapeshyftSchema.table(
     display_name: varchar("display_name", { length: 255 }).notNull(),
     description: text("description"),
     is_active: boolean("is_active").default(true),
+    // API Key fields
+    encrypted_api_key: text("encrypted_api_key"),
+    api_key_iv: varchar("api_key_iv", { length: 32 }),
+    api_key_prefix: varchar("api_key_prefix", { length: 20 }),
+    api_key_created_at: timestamp("api_key_created_at"),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),
   },
@@ -125,6 +131,8 @@ export const endpoints = shapeshyftSchema.table(
     instructions: text("instructions"),
     context: text("context"),
     is_active: boolean("is_active").default(true),
+    // IP Allowlist - JSON array of IPv4 addresses, null = allow all
+    ip_allowlist: jsonb("ip_allowlist"),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),
   },
@@ -154,3 +162,12 @@ export const usageAnalytics = shapeshyftSchema.table("usage_analytics", {
   estimated_cost_cents: integer("estimated_cost_cents"),
   request_metadata: jsonb("request_metadata"),
 });
+
+// =============================================================================
+// Rate Limit Counters Table (from @sudobility/subscription_service)
+// =============================================================================
+
+export const rateLimitCounters = createRateLimitCountersTable(
+  shapeshyftSchema,
+  "shapeshyft"
+);

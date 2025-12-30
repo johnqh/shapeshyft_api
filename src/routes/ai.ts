@@ -23,6 +23,10 @@ import {
   estimateCost,
   type LLMRequest,
 } from "../services/llm";
+import {
+  validateProjectApiKey,
+  isValidApiKeyFormat,
+} from "../lib/api-key";
 
 const aiRouter = new Hono();
 
@@ -44,6 +48,68 @@ interface ValidationError {
 }
 
 type ValidationResult = ValidatedContext | ValidationError;
+
+// =============================================================================
+// Security Helpers
+// =============================================================================
+
+/**
+ * Extract API key from request (query param or Authorization header)
+ */
+function extractApiKey(c: any): string | null {
+  // 1. Check query parameter
+  const url = new URL(c.req.url);
+  const queryKey = url.searchParams.get("api_key");
+  if (queryKey) {
+    return queryKey;
+  }
+
+  // 2. Check Authorization header (Bearer token)
+  const authHeader = c.req.header("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return authHeader.substring(7);
+  }
+
+  return null;
+}
+
+/**
+ * Get client IP address from request
+ */
+function getClientIp(c: any): string | null {
+  // Check common proxy headers first
+  const xForwardedFor = c.req.header("X-Forwarded-For");
+  if (xForwardedFor) {
+    // X-Forwarded-For can be comma-separated list; take the first (client) IP
+    return xForwardedFor.split(",")[0]?.trim() ?? null;
+  }
+
+  const xRealIp = c.req.header("X-Real-IP");
+  if (xRealIp) {
+    return xRealIp;
+  }
+
+  // Fallback to connection info if available
+  // Note: This may not work in all environments
+  return c.req.raw?.socket?.remoteAddress ?? null;
+}
+
+/**
+ * Check if IP is in the allowlist
+ */
+function isIpAllowed(clientIp: string | null, allowlist: string[] | null): boolean {
+  // If no allowlist is set, allow all
+  if (!allowlist || allowlist.length === 0) {
+    return true;
+  }
+
+  // If allowlist is set but no client IP, deny
+  if (!clientIp) {
+    return false;
+  }
+
+  return allowlist.includes(clientIp);
+}
 
 // =============================================================================
 // Shared Validation Logic
@@ -119,7 +185,51 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
   }
   const project = projectRows[0]!;
 
-  // 3. Find endpoint by name within project
+  // 3. Validate API key
+  const providedApiKey = extractApiKey(c);
+  if (!providedApiKey) {
+    return {
+      success: false,
+      response: c.json(
+        errorResponse("API key required. Provide via api_key query parameter or Authorization header"),
+        401
+      ),
+    };
+  }
+
+  if (!isValidApiKeyFormat(providedApiKey)) {
+    return {
+      success: false,
+      response: c.json(errorResponse("Invalid API key format"), 401),
+    };
+  }
+
+  // Check if project has an API key configured
+  if (!project.encrypted_api_key || !project.api_key_iv) {
+    return {
+      success: false,
+      response: c.json(
+        errorResponse("Project API key not configured"),
+        500
+      ),
+    };
+  }
+
+  // Validate the provided API key against stored encrypted key
+  const isValidKey = validateProjectApiKey(
+    providedApiKey,
+    project.encrypted_api_key,
+    project.api_key_iv
+  );
+
+  if (!isValidKey) {
+    return {
+      success: false,
+      response: c.json(errorResponse("Invalid API key"), 401),
+    };
+  }
+
+  // 4. Find endpoint by name within project
   const endpointRows = await db
     .select()
     .from(endpoints)
@@ -139,7 +249,22 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
   }
   const endpoint = endpointRows[0]!;
 
-  // 4. Validate HTTP method matches endpoint definition
+  // 5. Validate IP allowlist (if configured on endpoint)
+  const ipAllowlist = endpoint.ip_allowlist as string[] | null;
+  if (ipAllowlist && ipAllowlist.length > 0) {
+    const clientIp = getClientIp(c);
+    if (!isIpAllowed(clientIp, ipAllowlist)) {
+      return {
+        success: false,
+        response: c.json(
+          errorResponse(`IP address ${clientIp ?? "unknown"} is not allowed to access this endpoint`),
+          403
+        ),
+      };
+    }
+  }
+
+  // 6. Validate HTTP method matches endpoint definition
   const requestMethod = c.req.method;
   if (endpoint.http_method !== requestMethod) {
     return {
@@ -153,7 +278,7 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
     };
   }
 
-  // 5. Get input data based on method
+  // 7. Get input data based on method
   let inputData: unknown;
   try {
     if (requestMethod === "GET") {
@@ -171,7 +296,7 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
     };
   }
 
-  // 6. Get LLM API key
+  // 8. Get LLM API key
   const keyRows = await db
     .select()
     .from(llmApiKeys)

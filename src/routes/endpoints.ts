@@ -260,6 +260,14 @@ endpointsRouter.put(
       }
     }
 
+    // Handle ip_allowlist - null means clear, undefined means keep current
+    const ipAllowlist =
+      body.ip_allowlist === null
+        ? null
+        : body.ip_allowlist !== undefined
+          ? body.ip_allowlist
+          : current.ip_allowlist;
+
     const rows = await db
       .update(endpoints)
       .set({
@@ -272,6 +280,7 @@ endpointsRouter.put(
         instructions: body.instructions ?? current.instructions,
         context: body.context ?? current.context,
         is_active: body.is_active ?? current.is_active,
+        ip_allowlist: ipAllowlist,
         updated_at: new Date(),
       })
       .where(eq(endpoints.uuid, endpointId))

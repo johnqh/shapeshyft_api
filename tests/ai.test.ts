@@ -10,6 +10,7 @@ describe("AI Routes", () => {
   let keyId: string;
   let projectId: string;
   let orgPath: string;
+  let projectApiKey: string;
 
   beforeAll(async () => {
     await initDatabase();
@@ -38,6 +39,15 @@ describe("AI Routes", () => {
     });
     const projectJson = await projectRes.json();
     projectId = projectJson.data.uuid;
+
+    // Get the project's API key
+    const apiKeyRes = await createTestRequest(
+      app,
+      "GET",
+      `/api/v1/users/${userId}/projects/${projectId}/api-key`
+    );
+    const apiKeyJson = await apiKeyRes.json();
+    projectApiKey = apiKeyJson.data.api_key;
 
     // Get user UUID to derive organization path
     const userUuid = await getUserUuid(userId);
@@ -81,7 +91,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${orgPath}/${projectName}/non-existent-endpoint`,
+        `/api/v1/ai/${orgPath}/${projectName}/non-existent-endpoint?api_key=${projectApiKey}`,
         { body: { text: "test" } }
       );
       expect(res.status).toBe(404);
@@ -107,7 +117,7 @@ describe("AI Routes", () => {
         }
       );
 
-      const res = await createTestRequest(app, "GET", `/api/v1/ai/${orgPath}/${projectName}/post-only`);
+      const res = await createTestRequest(app, "GET", `/api/v1/ai/${orgPath}/${projectName}/post-only?api_key=${projectApiKey}`);
       expect(res.status).toBe(405);
 
       const json = await res.json();
@@ -147,7 +157,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${orgPath}/${projectName}/to-deactivate`,
+        `/api/v1/ai/${orgPath}/${projectName}/to-deactivate?api_key=${projectApiKey}`,
         {
           body: { data: "test" },
         }
@@ -182,7 +192,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${orgPath}/${projectName}/test-endpoint`,
+        `/api/v1/ai/${orgPath}/${projectName}/test-endpoint?api_key=${projectApiKey}`,
         {
           body: { data: "test" },
         }
@@ -221,7 +231,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${orgPath}/${projectName}/structured-endpoint/prompt`,
+        `/api/v1/ai/${orgPath}/${projectName}/structured-endpoint/prompt?api_key=${projectApiKey}`,
         {
           body: {
             name: "John",
@@ -244,7 +254,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${orgPath}/${projectName}/non-existent/prompt`,
+        `/api/v1/ai/${orgPath}/${projectName}/non-existent/prompt?api_key=${projectApiKey}`,
         { body: { text: "test" } }
       );
       expect(res.status).toBe(404);
@@ -275,7 +285,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/ai/${orgPath}/${projectName}/openai-endpoint/prompt`,
+        `/api/v1/ai/${orgPath}/${projectName}/openai-endpoint/prompt?api_key=${projectApiKey}`,
         {
           body: {
             data: "Test input",
@@ -312,7 +322,7 @@ describe("AI Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/ai/${orgPath}/${projectName}/get-prompt-endpoint/prompt?question=What+is+2+2`
+        `/api/v1/ai/${orgPath}/${projectName}/get-prompt-endpoint/prompt?question=What+is+2+2&api_key=${projectApiKey}`
       );
 
       expect(res.status).toBe(200);

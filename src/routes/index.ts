@@ -6,6 +6,7 @@ import endpointsRouter from "./endpoints";
 import analyticsRouter from "./analytics";
 import settingsRouter from "./settings";
 import aiRouter from "./ai";
+import ratelimitsRouter from "./ratelimits";
 
 const routes = new Hono();
 
@@ -24,6 +25,7 @@ adminRoutes.route(
 );
 adminRoutes.route("/users/:userId/analytics", analyticsRouter);
 adminRoutes.route("/users/:userId/settings", settingsRouter);
+adminRoutes.route("/ratelimits", ratelimitsRouter);
 routes.route("/", adminRoutes);
 
 export default routes;
@@ -36,4 +38,5 @@ export {
   analyticsRouter,
   settingsRouter,
   aiRouter,
+  ratelimitsRouter,
 };

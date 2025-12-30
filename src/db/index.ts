@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 import { getRequiredEnv } from "../lib/env-helper";
+import { initRateLimitTable } from "@sudobility/ratelimit_service";
 
 const connectionString = getRequiredEnv("DATABASE_URL");
 
@@ -140,6 +141,33 @@ export async function initDatabase() {
     END $$;
   `;
 
+  // Migration: Add API key columns to projects table
+  await client`
+    ALTER TABLE shapeshyft.projects
+    ADD COLUMN IF NOT EXISTS encrypted_api_key TEXT
+  `;
+
+  await client`
+    ALTER TABLE shapeshyft.projects
+    ADD COLUMN IF NOT EXISTS api_key_iv VARCHAR(32)
+  `;
+
+  await client`
+    ALTER TABLE shapeshyft.projects
+    ADD COLUMN IF NOT EXISTS api_key_prefix VARCHAR(20)
+  `;
+
+  await client`
+    ALTER TABLE shapeshyft.projects
+    ADD COLUMN IF NOT EXISTS api_key_created_at TIMESTAMP
+  `;
+
+  // Migration: Add IP allowlist column to endpoints table
+  await client`
+    ALTER TABLE shapeshyft.endpoints
+    ADD COLUMN IF NOT EXISTS ip_allowlist JSONB
+  `;
+
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.usage_analytics (
       uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -160,6 +188,9 @@ export async function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_usage_endpoint_timestamp
     ON shapeshyft.usage_analytics(endpoint_id, timestamp DESC)
   `;
+
+  // Rate limit counters table (from @sudobility/subscription_service)
+  await initRateLimitTable(client, "shapeshyft", "shapeshyft");
 
   console.log("Database tables initialized");
 }

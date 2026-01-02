@@ -8,12 +8,15 @@ import {
   endpointsRouter,
   analyticsRouter,
   aiRouter,
+  entitiesRouter,
 } from "../../src/routes";
 
 /**
  * Create a test app with mocked Firebase auth
+ * @param mockUser - Mock Firebase user for authentication
+ * @param testUserId - Internal user UUID (from users table)
  */
-export function createTestApp(mockUser: MockFirebaseUser = testUser) {
+export function createTestApp(mockUser: MockFirebaseUser = testUser, testUserId?: string) {
   const app = new Hono();
 
   // Middleware
@@ -35,12 +38,13 @@ export function createTestApp(mockUser: MockFirebaseUser = testUser) {
 
   // Admin routes - apply mock auth middleware
   const adminRoutes = new Hono();
-  adminRoutes.use("*", mockFirebaseAuthMiddleware(mockUser));
+  adminRoutes.use("*", mockFirebaseAuthMiddleware(mockUser, testUserId));
 
-  // Mount admin routers
-  adminRoutes.route("/users/:userId/keys", keysRouter);
-  adminRoutes.route("/users/:userId/projects", projectsRouter);
-  adminRoutes.route("/users/:userId/projects/:projectId/endpoints", endpointsRouter);
+  // Mount admin routers - entity-based routes
+  adminRoutes.route("/entities/:entitySlug/keys", keysRouter);
+  adminRoutes.route("/entities/:entitySlug/projects", projectsRouter);
+  adminRoutes.route("/entities/:entitySlug/projects/:projectId/endpoints", endpointsRouter);
+  adminRoutes.route("/entities", entitiesRouter);
   adminRoutes.route("/users/:userId/analytics", analyticsRouter);
 
   routes.route("/", adminRoutes);

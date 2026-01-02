@@ -7,6 +7,8 @@ import analyticsRouter from "./analytics";
 import settingsRouter from "./settings";
 import aiRouter from "./ai";
 import ratelimitsRouter from "./ratelimits";
+import entitiesRouter from "./entities";
+import invitationsRouter from "./invitations";
 
 const routes = new Hono();
 
@@ -17,15 +19,17 @@ routes.route("/ai", aiRouter);
 // Admin routes (Firebase auth required)
 const adminRoutes = new Hono();
 adminRoutes.use("*", firebaseAuthMiddleware);
-adminRoutes.route("/users/:userId/keys", keysRouter);
-adminRoutes.route("/users/:userId/projects", projectsRouter);
+adminRoutes.route("/entities/:entitySlug/keys", keysRouter);
+adminRoutes.route("/entities/:entitySlug/projects", projectsRouter);
 adminRoutes.route(
-  "/users/:userId/projects/:projectId/endpoints",
+  "/entities/:entitySlug/projects/:projectId/endpoints",
   endpointsRouter
 );
 adminRoutes.route("/users/:userId/analytics", analyticsRouter);
 adminRoutes.route("/users/:userId/settings", settingsRouter);
 adminRoutes.route("/ratelimits", ratelimitsRouter);
+adminRoutes.route("/entities", entitiesRouter);
+adminRoutes.route("/invitations", invitationsRouter);
 routes.route("/", adminRoutes);
 
 export default routes;
@@ -39,4 +43,6 @@ export {
   settingsRouter,
   aiRouter,
   ratelimitsRouter,
+  entitiesRouter,
+  invitationsRouter,
 };

@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -30,8 +30,9 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@google/generative-ai": "^0.21.0",
     "@hono/zod-validator": "^0.7.5",
+    "@sudobility/entity_service": "file:../entity_service",
     "@sudobility/ratelimit_service": "^1.0.2",
-    "@sudobility/shapeshyft_types": "^1.0.9",
+    "@sudobility/shapeshyft_types": "file:../shapeshyft_types",
     "@sudobility/types": "^1.9.38",
     "drizzle-orm": "^0.45.0",
     "firebase-admin": "^13.6.0",

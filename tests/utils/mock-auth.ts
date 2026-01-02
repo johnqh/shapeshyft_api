@@ -45,11 +45,19 @@ export function createMockDecodedToken(
 /**
  * Mock Firebase auth middleware for testing
  * Automatically authenticates requests with the test user
+ * Also sets userId from the testUserId parameter (internal user UUID)
  */
-export function mockFirebaseAuthMiddleware(mockUser: MockFirebaseUser = testUser) {
+export function mockFirebaseAuthMiddleware(
+  mockUser: MockFirebaseUser = testUser,
+  testUserId?: string
+) {
   return async (c: Context, next: Next) => {
     const decodedToken = createMockDecodedToken(mockUser);
     c.set("firebaseUser", decodedToken);
+    // Set userId - this would normally be set by the real auth middleware after DB lookup
+    if (testUserId) {
+      c.set("userId", testUserId);
+    }
     await next();
   };
 }

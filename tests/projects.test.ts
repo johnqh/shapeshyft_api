@@ -1,27 +1,35 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { createTestApp, createTestRequest, testUser } from "./utils";
-import { cleanupTestUser } from "./utils/test-db";
+import { cleanupTestUser, createTestUserWithEntity } from "./utils/test-db";
 import { initDatabase } from "../src/db";
+import type { Hono } from "hono";
 
 describe("Projects Routes", () => {
-  const app = createTestApp();
-  const userId = testUser.uid;
+  let app: Hono;
+  let entitySlug: string;
+  let userId: string;
 
   beforeAll(async () => {
     await initDatabase();
   });
 
   beforeEach(async () => {
-    await cleanupTestUser(userId);
+    await cleanupTestUser(testUser.uid);
+    // Create user with entity for each test
+    const { user, entity } = await createTestUserWithEntity(testUser);
+    userId = user.id;
+    entitySlug = entity.entity_slug;
+    // Create app with the user's ID
+    app = createTestApp(testUser, userId);
   });
 
   afterAll(async () => {
-    await cleanupTestUser(userId);
+    await cleanupTestUser(testUser.uid);
   });
 
-  describe("GET /api/v1/users/:userId/projects", () => {
+  describe("GET /api/v1/entities/:entitySlug/projects", () => {
     it("should return empty array when no projects exist", async () => {
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/projects`);
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/projects`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -29,16 +37,16 @@ describe("Projects Routes", () => {
       expect(json.data).toEqual([]);
     });
 
-    it("should return projects for user", async () => {
+    it("should return projects for entity", async () => {
       // Create a project first
-      await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
+      await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/projects`, {
         body: {
           project_name: "test-project",
           display_name: "Test Project",
         },
       });
 
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/projects`);
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/projects`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -47,15 +55,15 @@ describe("Projects Routes", () => {
       expect(json.data[0].project_name).toBe("test-project");
     });
 
-    it("should reject access to other user's projects", async () => {
-      const res = await createTestRequest(app, "GET", `/api/v1/users/other-user-id/projects`);
-      expect(res.status).toBe(403);
+    it("should return 404 for non-existent entity", async () => {
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/nonexist/projects`);
+      expect(res.status).toBe(404);
     });
   });
 
-  describe("POST /api/v1/users/:userId/projects", () => {
+  describe("POST /api/v1/entities/:entitySlug/projects", () => {
     it("should create a new project", async () => {
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/projects`, {
         body: {
           project_name: "my-api",
           display_name: "My API",
@@ -74,7 +82,7 @@ describe("Projects Routes", () => {
     });
 
     it("should create project without description", async () => {
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/projects`, {
         body: {
           project_name: "minimal-project",
           display_name: "Minimal Project",
@@ -87,9 +95,9 @@ describe("Projects Routes", () => {
       expect(json.data.description).toBeNull();
     });
 
-    it("should reject duplicate project_name for same user", async () => {
+    it("should reject duplicate project_name for same entity", async () => {
       // Create first project
-      await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
+      await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/projects`, {
         body: {
           project_name: "unique-project",
           display_name: "First Project",
@@ -97,7 +105,7 @@ describe("Projects Routes", () => {
       });
 
       // Try to create duplicate
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/projects`, {
         body: {
           project_name: "unique-project",
           display_name: "Second Project",
@@ -108,7 +116,7 @@ describe("Projects Routes", () => {
     });
 
     it("should reject missing project_name", async () => {
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/projects`, {
         body: {
           display_name: "No Name Project",
         },
@@ -118,7 +126,7 @@ describe("Projects Routes", () => {
     });
 
     it("should reject missing display_name", async () => {
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/projects`, {
         body: {
           project_name: "no-display",
         },
@@ -128,22 +136,27 @@ describe("Projects Routes", () => {
     });
   });
 
-  describe("GET /api/v1/users/:userId/projects/:projectId", () => {
+  describe("GET /api/v1/entities/:entitySlug/projects/:projectId", () => {
     it("should return a specific project", async () => {
       // Create project first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
-        body: {
-          project_name: "test-project",
-          display_name: "Test Project",
-        },
-      });
+      const createRes = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects`,
+        {
+          body: {
+            project_name: "test-project",
+            display_name: "Test Project",
+          },
+        }
+      );
       const createJson = await createRes.json();
       const projectId = createJson.data.uuid;
 
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/projects/${projectId}`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}`
       );
       expect(res.status).toBe(200);
 
@@ -156,28 +169,33 @@ describe("Projects Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/projects/00000000-0000-0000-0000-000000000000`
+        `/api/v1/entities/${entitySlug}/projects/00000000-0000-0000-0000-000000000000`
       );
       expect(res.status).toBe(404);
     });
   });
 
-  describe("PUT /api/v1/users/:userId/projects/:projectId", () => {
+  describe("PUT /api/v1/entities/:entitySlug/projects/:projectId", () => {
     it("should update project display_name", async () => {
       // Create project first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
-        body: {
-          project_name: "test-project",
-          display_name: "Original Name",
-        },
-      });
+      const createRes = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects`,
+        {
+          body: {
+            project_name: "test-project",
+            display_name: "Original Name",
+          },
+        }
+      );
       const createJson = await createRes.json();
       const projectId = createJson.data.uuid;
 
       const res = await createTestRequest(
         app,
         "PUT",
-        `/api/v1/users/${userId}/projects/${projectId}`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}`,
         {
           body: {
             display_name: "Updated Name",
@@ -193,19 +211,24 @@ describe("Projects Routes", () => {
 
     it("should update project description", async () => {
       // Create project first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
-        body: {
-          project_name: "test-project",
-          display_name: "Test Project",
-        },
-      });
+      const createRes = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects`,
+        {
+          body: {
+            project_name: "test-project",
+            display_name: "Test Project",
+          },
+        }
+      );
       const createJson = await createRes.json();
       const projectId = createJson.data.uuid;
 
       const res = await createTestRequest(
         app,
         "PUT",
-        `/api/v1/users/${userId}/projects/${projectId}`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}`,
         {
           body: {
             description: "New description",
@@ -221,19 +244,24 @@ describe("Projects Routes", () => {
 
     it("should deactivate project", async () => {
       // Create project first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
-        body: {
-          project_name: "test-project",
-          display_name: "Test Project",
-        },
-      });
+      const createRes = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects`,
+        {
+          body: {
+            project_name: "test-project",
+            display_name: "Test Project",
+          },
+        }
+      );
       const createJson = await createRes.json();
       const projectId = createJson.data.uuid;
 
       const res = await createTestRequest(
         app,
         "PUT",
-        `/api/v1/users/${userId}/projects/${projectId}`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}`,
         {
           body: {
             is_active: false,
@@ -248,22 +276,27 @@ describe("Projects Routes", () => {
     });
   });
 
-  describe("DELETE /api/v1/users/:userId/projects/:projectId", () => {
+  describe("DELETE /api/v1/entities/:entitySlug/projects/:projectId", () => {
     it("should delete a project", async () => {
       // Create project first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
-        body: {
-          project_name: "test-project",
-          display_name: "Test Project",
-        },
-      });
+      const createRes = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects`,
+        {
+          body: {
+            project_name: "test-project",
+            display_name: "Test Project",
+          },
+        }
+      );
       const createJson = await createRes.json();
       const projectId = createJson.data.uuid;
 
       const res = await createTestRequest(
         app,
         "DELETE",
-        `/api/v1/users/${userId}/projects/${projectId}`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}`
       );
       expect(res.status).toBe(200);
 
@@ -271,7 +304,7 @@ describe("Projects Routes", () => {
       const getRes = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/projects/${projectId}`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}`
       );
       expect(getRes.status).toBe(404);
     });
@@ -280,7 +313,7 @@ describe("Projects Routes", () => {
       const res = await createTestRequest(
         app,
         "DELETE",
-        `/api/v1/users/${userId}/projects/00000000-0000-0000-0000-000000000000`
+        `/api/v1/entities/${entitySlug}/projects/00000000-0000-0000-0000-000000000000`
       );
       expect(res.status).toBe(404);
     });

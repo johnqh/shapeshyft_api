@@ -1,11 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
-import { db, users, projects, endpoints, usageAnalytics } from "../db";
-import { userIdParamSchema, analyticsQuerySchema } from "../schemas";
+import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
+import { db, projects, endpoints, usageAnalytics, entityMembers } from "../db";
+import { analyticsQuerySchema } from "../schemas";
 import {
   successResponse,
-  errorResponse,
   type UsageAggregate,
   type UsageByEndpoint,
   type AnalyticsResponse,
@@ -14,44 +13,57 @@ import {
 const analyticsRouter = new Hono();
 
 /**
- * Helper to get user by Firebase UID
+ * Helper to get all entity IDs the user is a member of
  */
-async function getUserByFirebaseUid(firebaseUid: string) {
-  const rows = await db
-    .select()
-    .from(users)
-    .where(eq(users.firebase_uid, firebaseUid));
+async function getUserEntityIds(userId: string): Promise<string[]> {
+  const memberships = await db
+    .select({ entityId: entityMembers.entity_id })
+    .from(entityMembers)
+    .where(eq(entityMembers.user_id, userId));
 
-  return rows.length > 0 ? rows[0]! : null;
+  return memberships.map(m => m.entityId);
 }
 
-// GET analytics for user
+// GET analytics for user (across all their entities)
 analyticsRouter.get(
   "/",
-  zValidator("param", userIdParamSchema),
   zValidator("query", analyticsQuerySchema),
   async c => {
-    const firebaseUser = c.get("firebaseUser");
-    const { userId } = c.req.valid("param");
+    const authenticatedUserId = c.get("userId");
+    const requestedUserId = c.req.param("userId");
+
+    // Users can only view their own analytics
+    if (requestedUserId !== authenticatedUserId) {
+      return c.json({ success: false, error: "Access denied" }, 403);
+    }
+
+    const userId = authenticatedUserId;
     const query = c.req.valid("query");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only access your own analytics"),
-        403
-      );
+    // Get all entities the user is a member of
+    const entityIds = await getUserEntityIds(userId);
+
+    if (entityIds.length === 0) {
+      const emptyResponse: AnalyticsResponse = {
+        aggregate: {
+          total_requests: 0,
+          successful_requests: 0,
+          failed_requests: 0,
+          total_tokens_input: 0,
+          total_tokens_output: 0,
+          total_estimated_cost_cents: 0,
+          average_latency_ms: 0,
+        },
+        by_endpoint: [],
+      };
+      return c.json(successResponse(emptyResponse));
     }
 
-    const user = await getUserByFirebaseUid(firebaseUser.uid);
-    if (!user) {
-      return c.json(errorResponse("User not found"), 404);
-    }
-
-    // Get all user's projects
+    // Get all projects across user's entities
     const userProjects = await db
       .select()
       .from(projects)
-      .where(eq(projects.user_id, user.uuid));
+      .where(inArray(projects.entity_id, entityIds));
 
     if (userProjects.length === 0) {
       const emptyResponse: AnalyticsResponse = {

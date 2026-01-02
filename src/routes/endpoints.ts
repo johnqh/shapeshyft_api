@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
-import { db, users, projects, endpoints, llmApiKeys } from "../db";
+import { db, entities, entityMembers, projects, endpoints, llmApiKeys, entityInvitations, users } from "../db";
 import {
   endpointCreateSchema,
   endpointUpdateSchema,
@@ -9,93 +9,114 @@ import {
   projectIdParamSchema,
 } from "../schemas";
 import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
+import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
 
 const endpointsRouter = new Hono();
 
-/**
- * Helper to get user by Firebase UID
- */
-async function getUserByFirebaseUid(firebaseUid: string) {
-  const rows = await db
-    .select()
-    .from(users)
-    .where(eq(users.firebase_uid, firebaseUid));
+// Create entity helpers
+const config: InvitationHelperConfig = {
+  db: db as any,
+  entitiesTable: entities,
+  membersTable: entityMembers,
+  invitationsTable: entityInvitations,
+  usersTable: users,
+};
 
-  return rows.length > 0 ? rows[0]! : null;
+const helpers = createEntityHelpers(config);
+
+/**
+ * Helper to get entity by slug and verify user membership
+ */
+async function getEntityWithPermission(
+  entitySlug: string,
+  userId: string,
+  requireEdit = false
+): Promise<{ entity: typeof entities.$inferSelect; error?: string } | { entity?: undefined; error: string }> {
+  const entity = await helpers.entity.getEntityBySlug(entitySlug);
+  if (!entity) {
+    return { error: "Entity not found" };
+  }
+
+  if (requireEdit) {
+    const canEdit = await helpers.permissions.canCreateProjects(entity.id, userId);
+    if (!canEdit) {
+      return { error: "Insufficient permissions" };
+    }
+  } else {
+    const canView = await helpers.permissions.canViewEntity(entity.id, userId);
+    if (!canView) {
+      return { error: "Access denied" };
+    }
+  }
+
+  return { entity };
 }
 
 /**
- * Helper to verify project belongs to user
+ * Helper to verify project belongs to entity
  */
-async function verifyProjectOwnership(userUuid: string, projectId: string) {
+async function verifyProjectOwnership(entityId: string, projectId: string) {
   const rows = await db
     .select()
     .from(projects)
-    .where(and(eq(projects.user_id, userUuid), eq(projects.uuid, projectId)));
+    .where(and(eq(projects.entity_id, entityId), eq(projects.uuid, projectId)));
 
   return rows.length > 0 ? rows[0]! : null;
 }
 
 /**
- * Helper to verify LLM key belongs to user
+ * Helper to verify LLM key belongs to entity
  */
-async function verifyKeyOwnership(userUuid: string, keyId: string) {
+async function verifyKeyOwnership(entityId: string, keyId: string) {
   const rows = await db
     .select()
     .from(llmApiKeys)
-    .where(and(eq(llmApiKeys.user_id, userUuid), eq(llmApiKeys.uuid, keyId)));
+    .where(and(eq(llmApiKeys.entity_id, entityId), eq(llmApiKeys.uuid, keyId)));
 
   return rows.length > 0 ? rows[0]! : null;
 }
 
 // GET all endpoints for project
-endpointsRouter.get("/", zValidator("param", projectIdParamSchema), async c => {
-  const firebaseUser = c.get("firebaseUser");
-  const { userId, projectId } = c.req.valid("param");
+endpointsRouter.get(
+  "/",
+  zValidator("param", projectIdParamSchema),
+  async c => {
+    const userId = c.get("userId");
+    const { entitySlug, projectId } = c.req.valid("param");
 
-  if (firebaseUser.uid !== userId) {
-    return c.json(errorResponse("You can only access your own endpoints"), 403);
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+    }
+
+    const project = await verifyProjectOwnership(result.entity.id, projectId);
+    if (!project) {
+      return c.json(errorResponse("Project not found"), 404);
+    }
+
+    const rows = await db
+      .select()
+      .from(endpoints)
+      .where(eq(endpoints.project_id, projectId));
+
+    return c.json(successResponse(rows));
   }
-
-  const user = await getUserByFirebaseUid(firebaseUser.uid);
-  if (!user) {
-    return c.json(errorResponse("User not found"), 404);
-  }
-
-  const project = await verifyProjectOwnership(user.uuid, projectId);
-  if (!project) {
-    return c.json(errorResponse("Project not found"), 404);
-  }
-
-  const rows = await db
-    .select()
-    .from(endpoints)
-    .where(eq(endpoints.project_id, projectId));
-
-  return c.json(successResponse(rows));
-});
+);
 
 // GET single endpoint
 endpointsRouter.get(
   "/:endpointId",
   zValidator("param", endpointIdParamSchema),
   async c => {
-    const firebaseUser = c.get("firebaseUser");
-    const { userId, projectId, endpointId } = c.req.valid("param");
+    const userId = c.get("userId");
+    const { entitySlug, projectId, endpointId } = c.req.valid("param");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only access your own endpoints"),
-        403
-      );
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
     }
 
-    const user = await getUserByFirebaseUid(firebaseUser.uid);
-    if (!user) {
-      return c.json(errorResponse("User not found"), 404);
-    }
-
-    const project = await verifyProjectOwnership(user.uuid, projectId);
+    const project = await verifyProjectOwnership(result.entity.id, projectId);
     if (!project) {
       return c.json(errorResponse("Project not found"), 404);
     }
@@ -121,32 +142,25 @@ endpointsRouter.post(
   zValidator("param", projectIdParamSchema),
   zValidator("json", endpointCreateSchema),
   async c => {
-    const firebaseUser = c.get("firebaseUser");
-    const { userId, projectId } = c.req.valid("param");
+    const userId = c.get("userId");
+    const { entitySlug, projectId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only create your own endpoints"),
-        403
-      );
+    const result = await getEntityWithPermission(entitySlug, userId, true);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
     }
 
-    const user = await getUserByFirebaseUid(firebaseUser.uid);
-    if (!user) {
-      return c.json(errorResponse("User not found"), 404);
-    }
-
-    const project = await verifyProjectOwnership(user.uuid, projectId);
+    const project = await verifyProjectOwnership(result.entity.id, projectId);
     if (!project) {
       return c.json(errorResponse("Project not found"), 404);
     }
 
-    // Verify LLM key belongs to user
-    const llmKey = await verifyKeyOwnership(user.uuid, body.llm_key_id);
+    // Verify LLM key belongs to entity
+    const llmKey = await verifyKeyOwnership(result.entity.id, body.llm_key_id);
     if (!llmKey) {
       return c.json(
-        errorResponse("LLM key not found or doesn't belong to you"),
+        errorResponse("LLM key not found or doesn't belong to this entity"),
         400
       );
     }
@@ -194,23 +208,16 @@ endpointsRouter.put(
   zValidator("param", endpointIdParamSchema),
   zValidator("json", endpointUpdateSchema),
   async c => {
-    const firebaseUser = c.get("firebaseUser");
-    const { userId, projectId, endpointId } = c.req.valid("param");
+    const userId = c.get("userId");
+    const { entitySlug, projectId, endpointId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only update your own endpoints"),
-        403
-      );
+    const result = await getEntityWithPermission(entitySlug, userId, true);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
     }
 
-    const user = await getUserByFirebaseUid(firebaseUser.uid);
-    if (!user) {
-      return c.json(errorResponse("User not found"), 404);
-    }
-
-    const project = await verifyProjectOwnership(user.uuid, projectId);
+    const project = await verifyProjectOwnership(result.entity.id, projectId);
     if (!project) {
       return c.json(errorResponse("Project not found"), 404);
     }
@@ -229,12 +236,12 @@ endpointsRouter.put(
 
     const current = existing[0]!;
 
-    // If changing LLM key, verify it belongs to user
+    // If changing LLM key, verify it belongs to entity
     if (body.llm_key_id && body.llm_key_id !== current.llm_key_id) {
-      const llmKey = await verifyKeyOwnership(user.uuid, body.llm_key_id);
+      const llmKey = await verifyKeyOwnership(result.entity.id, body.llm_key_id);
       if (!llmKey) {
         return c.json(
-          errorResponse("LLM key not found or doesn't belong to you"),
+          errorResponse("LLM key not found or doesn't belong to this entity"),
           400
         );
       }
@@ -295,22 +302,15 @@ endpointsRouter.delete(
   "/:endpointId",
   zValidator("param", endpointIdParamSchema),
   async c => {
-    const firebaseUser = c.get("firebaseUser");
-    const { userId, projectId, endpointId } = c.req.valid("param");
+    const userId = c.get("userId");
+    const { entitySlug, projectId, endpointId } = c.req.valid("param");
 
-    if (firebaseUser.uid !== userId) {
-      return c.json(
-        errorResponse("You can only delete your own endpoints"),
-        403
-      );
+    const result = await getEntityWithPermission(entitySlug, userId, true);
+    if (result.error) {
+      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
     }
 
-    const user = await getUserByFirebaseUid(firebaseUser.uid);
-    if (!user) {
-      return c.json(errorResponse("User not found"), 404);
-    }
-
-    const project = await verifyProjectOwnership(user.uuid, projectId);
+    const project = await verifyProjectOwnership(result.entity.id, projectId);
     if (!project) {
       return c.json(errorResponse("Project not found"), 404);
     }

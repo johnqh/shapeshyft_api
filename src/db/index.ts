@@ -1,15 +1,38 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import postgres, { type Sql } from "postgres";
 import * as schema from "./schema";
 import { getRequiredEnv } from "../lib/env-helper";
 import { initRateLimitTable } from "@sudobility/ratelimit_service";
+import { runEntityMigration } from "@sudobility/entity_service";
 
-const connectionString = getRequiredEnv("DATABASE_URL");
+// Lazy-initialized database connection
+let _client: Sql | null = null;
+let _db: PostgresJsDatabase<typeof schema> | null = null;
 
-const client = postgres(connectionString);
-export const db = drizzle(client, { schema });
+function getClient(): Sql {
+  if (!_client) {
+    const connectionString = getRequiredEnv("DATABASE_URL");
+    _client = postgres(connectionString);
+  }
+  return _client;
+}
+
+// Export db as a getter to ensure lazy initialization
+export const db: PostgresJsDatabase<typeof schema> = new Proxy(
+  {} as PostgresJsDatabase<typeof schema>,
+  {
+    get(_, prop) {
+      if (!_db) {
+        _db = drizzle(getClient(), { schema });
+      }
+      return (_db as any)[prop];
+    },
+  }
+);
 
 export async function initDatabase() {
+  const client = getClient();
+
   // Create schema if it doesn't exist
   await client`CREATE SCHEMA IF NOT EXISTS shapeshyft`;
 
@@ -30,23 +53,13 @@ export async function initDatabase() {
     END $$;
   `;
 
-  await client`
-    DO $$ BEGIN
-      CREATE TYPE shapeshyft.endpoint_type AS ENUM (
-        'structured_in_structured_out',
-        'text_in_structured_out',
-        'structured_in_api_out',
-        'text_in_api_out'
-      );
-    EXCEPTION
-      WHEN duplicate_object THEN null;
-    END $$;
-  `;
+  // =============================================================================
+  // Step 1: Create users and user_settings tables
+  // =============================================================================
 
-  // Create tables
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.users (
-      uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       firebase_uid VARCHAR(128) NOT NULL UNIQUE,
       email VARCHAR(255),
       display_name VARCHAR(255),
@@ -57,8 +70,8 @@ export async function initDatabase() {
 
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.user_settings (
-      uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL UNIQUE REFERENCES shapeshyft.users(uuid) ON DELETE CASCADE,
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL UNIQUE REFERENCES shapeshyft.users(id) ON DELETE CASCADE,
       organization_name VARCHAR(255),
       organization_path VARCHAR(255) NOT NULL UNIQUE,
       created_at TIMESTAMP DEFAULT NOW(),
@@ -66,10 +79,26 @@ export async function initDatabase() {
     )
   `;
 
+  // =============================================================================
+  // Step 2: Run entity migration (creates entities, entity_members tables)
+  // This must happen BEFORE tables that reference entities.id
+  // =============================================================================
+
+  await runEntityMigration({
+    client,
+    schemaName: "shapeshyft",
+    indexPrefix: "shapeshyft",
+    migrateProjects: false, // Tables are created fresh with entity_id
+  });
+
+  // =============================================================================
+  // Step 3: Create llm_api_keys table (references entities.id)
+  // =============================================================================
+
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.llm_api_keys (
       uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES shapeshyft.users(uuid) ON DELETE CASCADE,
+      entity_id UUID NOT NULL REFERENCES shapeshyft.entities(id) ON DELETE CASCADE,
       key_name VARCHAR(255) NOT NULL,
       provider shapeshyft.llm_provider NOT NULL,
       encrypted_api_key TEXT,
@@ -81,19 +110,36 @@ export async function initDatabase() {
     )
   `;
 
+  // =============================================================================
+  // Step 4: Create projects table (references entities.id)
+  // =============================================================================
+
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.projects (
       uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES shapeshyft.users(uuid) ON DELETE CASCADE,
+      entity_id UUID NOT NULL REFERENCES shapeshyft.entities(id) ON DELETE CASCADE,
       project_name VARCHAR(255) NOT NULL,
       display_name VARCHAR(255) NOT NULL,
       description TEXT,
       is_active BOOLEAN DEFAULT true,
+      encrypted_api_key TEXT,
+      api_key_iv VARCHAR(32),
+      api_key_prefix VARCHAR(20),
+      api_key_created_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT NOW(),
-      updated_at TIMESTAMP DEFAULT NOW(),
-      UNIQUE(user_id, project_name)
+      updated_at TIMESTAMP DEFAULT NOW()
     )
   `;
+
+  // Create unique index for project_name per entity
+  await client`
+    CREATE UNIQUE INDEX IF NOT EXISTS unique_project_per_entity
+    ON shapeshyft.projects(entity_id, project_name)
+  `;
+
+  // =============================================================================
+  // Step 5: Create endpoints table (references projects.uuid and llm_api_keys.uuid)
+  // =============================================================================
 
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.endpoints (
@@ -108,65 +154,16 @@ export async function initDatabase() {
       instructions TEXT,
       context TEXT,
       is_active BOOLEAN DEFAULT true,
+      ip_allowlist JSONB,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(project_id, endpoint_name)
     )
   `;
 
-  // Migration: Add context column if it doesn't exist (for existing databases)
-  await client`
-    ALTER TABLE shapeshyft.endpoints
-    ADD COLUMN IF NOT EXISTS context TEXT
-  `;
-
-  // Migration: Drop endpoint_type column if it exists (no longer used)
-  await client`
-    ALTER TABLE shapeshyft.endpoints
-    DROP COLUMN IF EXISTS endpoint_type
-  `;
-
-  // Migration: Rename description column to instructions (if description exists)
-  await client`
-    DO $$
-    BEGIN
-      IF EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'shapeshyft'
-        AND table_name = 'endpoints'
-        AND column_name = 'description'
-      ) THEN
-        ALTER TABLE shapeshyft.endpoints RENAME COLUMN description TO instructions;
-      END IF;
-    END $$;
-  `;
-
-  // Migration: Add API key columns to projects table
-  await client`
-    ALTER TABLE shapeshyft.projects
-    ADD COLUMN IF NOT EXISTS encrypted_api_key TEXT
-  `;
-
-  await client`
-    ALTER TABLE shapeshyft.projects
-    ADD COLUMN IF NOT EXISTS api_key_iv VARCHAR(32)
-  `;
-
-  await client`
-    ALTER TABLE shapeshyft.projects
-    ADD COLUMN IF NOT EXISTS api_key_prefix VARCHAR(20)
-  `;
-
-  await client`
-    ALTER TABLE shapeshyft.projects
-    ADD COLUMN IF NOT EXISTS api_key_created_at TIMESTAMP
-  `;
-
-  // Migration: Add IP allowlist column to endpoints table
-  await client`
-    ALTER TABLE shapeshyft.endpoints
-    ADD COLUMN IF NOT EXISTS ip_allowlist JSONB
-  `;
+  // =============================================================================
+  // Step 6: Create usage_analytics table (references endpoints.uuid)
+  // =============================================================================
 
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.usage_analytics (
@@ -189,14 +186,21 @@ export async function initDatabase() {
     ON shapeshyft.usage_analytics(endpoint_id, timestamp DESC)
   `;
 
-  // Rate limit counters table (from @sudobility/subscription_service)
+  // =============================================================================
+  // Step 7: Rate limit counters table
+  // =============================================================================
+
   await initRateLimitTable(client, "shapeshyft", "shapeshyft");
 
   console.log("Database tables initialized");
 }
 
 export async function closeDatabase() {
-  await client.end();
+  if (_client) {
+    await _client.end();
+    _client = null;
+    _db = null;
+  }
 }
 
 // Re-export schema for convenience

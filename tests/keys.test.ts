@@ -1,27 +1,35 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { createTestApp, createTestRequest, testUser } from "./utils";
-import { cleanupTestUser, getTestUser, createTestLlmKey } from "./utils/test-db";
+import { cleanupTestUser, createTestUserWithEntity } from "./utils/test-db";
 import { initDatabase } from "../src/db";
+import type { Hono } from "hono";
 
 describe("Keys Routes", () => {
-  const app = createTestApp();
-  const userId = testUser.uid;
+  let app: Hono;
+  let entitySlug: string;
+  let userId: string;
 
   beforeAll(async () => {
     await initDatabase();
   });
 
   beforeEach(async () => {
-    await cleanupTestUser(userId);
+    await cleanupTestUser(testUser.uid);
+    // Create user with entity for each test
+    const { user, entity } = await createTestUserWithEntity(testUser);
+    userId = user.id;
+    entitySlug = entity.entity_slug;
+    // Create app with the user's ID
+    app = createTestApp(testUser, userId);
   });
 
   afterAll(async () => {
-    await cleanupTestUser(userId);
+    await cleanupTestUser(testUser.uid);
   });
 
-  describe("GET /api/v1/users/:userId/keys", () => {
+  describe("GET /api/v1/entities/:entitySlug/keys", () => {
     it("should return empty array when no keys exist", async () => {
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/keys`);
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/keys`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -29,31 +37,9 @@ describe("Keys Routes", () => {
       expect(json.data).toEqual([]);
     });
 
-    it("should return keys for user", async () => {
-      // Create user and key first
-      const user = await getTestUser(userId);
-      if (!user) {
-        // User will be created by the route
-        await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
-          body: {
-            key_name: "Test Key",
-            provider: "openai",
-            api_key: "sk-test-key-123",
-          },
-        });
-      }
-
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/keys`);
-      expect(res.status).toBe(200);
-
-      const json = await res.json();
-      expect(json.success).toBe(true);
-      expect(Array.isArray(json.data)).toBe(true);
-    });
-
-    it("should not expose encrypted API key", async () => {
+    it("should return keys for entity", async () => {
       // Create a key first
-      await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "Test Key",
           provider: "openai",
@@ -61,7 +47,26 @@ describe("Keys Routes", () => {
         },
       });
 
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/keys`);
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/keys`);
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(Array.isArray(json.data)).toBe(true);
+      expect(json.data.length).toBe(1);
+    });
+
+    it("should not expose encrypted API key", async () => {
+      // Create a key first
+      await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
+        body: {
+          key_name: "Test Key",
+          provider: "openai",
+          api_key: "sk-test-key-123",
+        },
+      });
+
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/keys`);
       const json = await res.json();
 
       expect(json.data[0]).not.toHaveProperty("encrypted_api_key");
@@ -69,18 +74,18 @@ describe("Keys Routes", () => {
       expect(json.data[0]).toHaveProperty("has_api_key", true);
     });
 
-    it("should reject access to other user's keys", async () => {
-      const res = await createTestRequest(app, "GET", `/api/v1/users/other-user-id/keys`);
-      expect(res.status).toBe(403);
+    it("should return 404 for non-existent entity", async () => {
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/nonexist/keys`);
+      expect(res.status).toBe(404);
 
       const json = await res.json();
       expect(json.success).toBe(false);
     });
   });
 
-  describe("POST /api/v1/users/:userId/keys", () => {
+  describe("POST /api/v1/entities/:entitySlug/keys", () => {
     it("should create a new key with API key", async () => {
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "My OpenAI Key",
           provider: "openai",
@@ -99,7 +104,7 @@ describe("Keys Routes", () => {
     });
 
     it("should create a new key with endpoint URL for llm_server", async () => {
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "My LLM Server",
           provider: "llm_server",
@@ -116,7 +121,7 @@ describe("Keys Routes", () => {
     });
 
     it("should reject invalid provider", async () => {
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "Invalid Key",
           provider: "invalid",
@@ -128,7 +133,7 @@ describe("Keys Routes", () => {
     });
 
     it("should reject missing key_name", async () => {
-      const res = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           provider: "openai",
           api_key: "sk-test",
@@ -139,10 +144,10 @@ describe("Keys Routes", () => {
     });
   });
 
-  describe("GET /api/v1/users/:userId/keys/:keyId", () => {
+  describe("GET /api/v1/entities/:entitySlug/keys/:keyId", () => {
     it("should return a specific key", async () => {
       // Create key first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const createRes = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "Test Key",
           provider: "anthropic",
@@ -152,7 +157,7 @@ describe("Keys Routes", () => {
       const createJson = await createRes.json();
       const keyId = createJson.data.uuid;
 
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/keys/${keyId}`);
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/keys/${keyId}`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -165,16 +170,16 @@ describe("Keys Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/keys/00000000-0000-0000-0000-000000000000`
+        `/api/v1/entities/${entitySlug}/keys/00000000-0000-0000-0000-000000000000`
       );
       expect(res.status).toBe(404);
     });
   });
 
-  describe("PUT /api/v1/users/:userId/keys/:keyId", () => {
+  describe("PUT /api/v1/entities/:entitySlug/keys/:keyId", () => {
     it("should update key name", async () => {
       // Create key first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const createRes = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "Original Name",
           provider: "openai",
@@ -184,7 +189,7 @@ describe("Keys Routes", () => {
       const createJson = await createRes.json();
       const keyId = createJson.data.uuid;
 
-      const res = await createTestRequest(app, "PUT", `/api/v1/users/${userId}/keys/${keyId}`, {
+      const res = await createTestRequest(app, "PUT", `/api/v1/entities/${entitySlug}/keys/${keyId}`, {
         body: {
           key_name: "Updated Name",
         },
@@ -198,7 +203,7 @@ describe("Keys Routes", () => {
 
     it("should update API key", async () => {
       // Create key first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const createRes = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "Test Key",
           provider: "openai",
@@ -208,7 +213,7 @@ describe("Keys Routes", () => {
       const createJson = await createRes.json();
       const keyId = createJson.data.uuid;
 
-      const res = await createTestRequest(app, "PUT", `/api/v1/users/${userId}/keys/${keyId}`, {
+      const res = await createTestRequest(app, "PUT", `/api/v1/entities/${entitySlug}/keys/${keyId}`, {
         body: {
           api_key: "sk-updated",
         },
@@ -221,7 +226,7 @@ describe("Keys Routes", () => {
 
     it("should deactivate key", async () => {
       // Create key first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const createRes = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "Test Key",
           provider: "openai",
@@ -231,7 +236,7 @@ describe("Keys Routes", () => {
       const createJson = await createRes.json();
       const keyId = createJson.data.uuid;
 
-      const res = await createTestRequest(app, "PUT", `/api/v1/users/${userId}/keys/${keyId}`, {
+      const res = await createTestRequest(app, "PUT", `/api/v1/entities/${entitySlug}/keys/${keyId}`, {
         body: {
           is_active: false,
         },
@@ -243,10 +248,10 @@ describe("Keys Routes", () => {
     });
   });
 
-  describe("DELETE /api/v1/users/:userId/keys/:keyId", () => {
+  describe("DELETE /api/v1/entities/:entitySlug/keys/:keyId", () => {
     it("should delete a key", async () => {
       // Create key first
-      const createRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+      const createRes = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "Test Key",
           provider: "openai",
@@ -256,11 +261,11 @@ describe("Keys Routes", () => {
       const createJson = await createRes.json();
       const keyId = createJson.data.uuid;
 
-      const res = await createTestRequest(app, "DELETE", `/api/v1/users/${userId}/keys/${keyId}`);
+      const res = await createTestRequest(app, "DELETE", `/api/v1/entities/${entitySlug}/keys/${keyId}`);
       expect(res.status).toBe(200);
 
       // Verify deletion
-      const getRes = await createTestRequest(app, "GET", `/api/v1/users/${userId}/keys/${keyId}`);
+      const getRes = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/keys/${keyId}`);
       expect(getRes.status).toBe(404);
     });
 
@@ -268,7 +273,7 @@ describe("Keys Routes", () => {
       const res = await createTestRequest(
         app,
         "DELETE",
-        `/api/v1/users/${userId}/keys/00000000-0000-0000-0000-000000000000`
+        `/api/v1/entities/${entitySlug}/keys/00000000-0000-0000-0000-000000000000`
       );
       expect(res.status).toBe(404);
     });

@@ -1,14 +1,13 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   db,
-  users,
-  userSettings,
   projects,
   endpoints,
   llmApiKeys,
   usageAnalytics,
+  entities,
 } from "../db";
 import { aiParamSchema } from "../schemas";
 import {
@@ -116,37 +115,18 @@ function isIpAllowed(clientIp: string | null, allowlist: string[] | null): boole
 // =============================================================================
 
 /**
- * Find user by organization path.
- * First checks user_settings table, then falls back to UUID prefix matching.
+ * Find entity by slug (organization path).
+ * The organization path in the public API URL is now the entity slug.
  */
-async function findUserByOrgPath(
-  organizationPath: string
-): Promise<typeof users.$inferSelect | null> {
-  // 1. Check user_settings for explicit organization_path
-  const settingsRows = await db
+async function findEntityBySlug(
+  entitySlug: string
+): Promise<typeof entities.$inferSelect | null> {
+  const entityRows = await db
     .select()
-    .from(userSettings)
-    .where(eq(userSettings.organization_path, organizationPath));
+    .from(entities)
+    .where(eq(entities.entity_slug, entitySlug));
 
-  if (settingsRows.length > 0) {
-    const userRows = await db
-      .select()
-      .from(users)
-      .where(eq(users.uuid, settingsRows[0]!.user_id));
-    return userRows[0] ?? null;
-  }
-
-  // 2. Fallback: check if organizationPath matches first 8 chars of any user UUID
-  // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-  // We need to match where uuid starts with the org path (without hyphens)
-  const userRows = await db
-    .select()
-    .from(users)
-    .where(
-      sql`REPLACE(${users.uuid}::text, '-', '') LIKE ${organizationPath + "%"}`
-    );
-
-  return userRows[0] ?? null;
+  return entityRows[0] ?? null;
 }
 
 /**
@@ -156,22 +136,22 @@ async function findUserByOrgPath(
 async function validateAndGetContext(c: any): Promise<ValidationResult> {
   const { organizationPath, projectName, endpointName } = c.req.valid("param");
 
-  // 1. Find user by organization path
-  const user = await findUserByOrgPath(organizationPath);
-  if (!user) {
+  // 1. Find entity by slug (organization path is now entity slug)
+  const entity = await findEntityBySlug(organizationPath);
+  if (!entity) {
     return {
       success: false,
       response: c.json(errorResponse("Organization not found"), 404),
     };
   }
 
-  // 2. Find project by name AND user_id
+  // 2. Find project by name AND entity_id
   const projectRows = await db
     .select()
     .from(projects)
     .where(
       and(
-        eq(projects.user_id, user.uuid),
+        eq(projects.entity_id, entity.id),
         eq(projects.project_name, projectName),
         eq(projects.is_active, true)
       )

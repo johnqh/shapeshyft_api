@@ -1,2 +1,5 @@
 [test]
 preload = ["./tests/setup.ts"]
+
+[test.env]
+DATABASE_URL = "postgres://localhost:5432/shapeshyft_test"

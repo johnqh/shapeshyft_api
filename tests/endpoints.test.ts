@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { createTestApp, createTestRequest, testUser } from "./utils";
-import { cleanupTestUser } from "./utils/test-db";
+import { cleanupTestUser, createTestUserWithEntity } from "./utils/test-db";
 import { initDatabase } from "../src/db";
+import type { Hono } from "hono";
 
 describe("Endpoints Routes", () => {
-  const app = createTestApp();
-  const userId = testUser.uid;
+  let app: Hono;
+  let entitySlug: string;
+  let userId: string;
   let projectId: string;
   let keyId: string;
 
@@ -14,10 +16,16 @@ describe("Endpoints Routes", () => {
   });
 
   beforeEach(async () => {
-    await cleanupTestUser(userId);
+    await cleanupTestUser(testUser.uid);
+    // Create user with entity for each test
+    const { user, entity } = await createTestUserWithEntity(testUser);
+    userId = user.id;
+    entitySlug = entity.entity_slug;
+    // Create app with the user's ID
+    app = createTestApp(testUser, userId);
 
     // Create a project and key for endpoint tests
-    const keyRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+    const keyRes = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
       body: {
         key_name: "Test Key",
         provider: "openai",
@@ -27,26 +35,31 @@ describe("Endpoints Routes", () => {
     const keyJson = await keyRes.json();
     keyId = keyJson.data.uuid;
 
-    const projectRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
-      body: {
-        project_name: "test-project",
-        display_name: "Test Project",
-      },
-    });
+    const projectRes = await createTestRequest(
+      app,
+      "POST",
+      `/api/v1/entities/${entitySlug}/projects`,
+      {
+        body: {
+          project_name: "test-project",
+          display_name: "Test Project",
+        },
+      }
+    );
     const projectJson = await projectRes.json();
     projectId = projectJson.data.uuid;
   });
 
   afterAll(async () => {
-    await cleanupTestUser(userId);
+    await cleanupTestUser(testUser.uid);
   });
 
-  describe("GET /api/v1/users/:userId/projects/:projectId/endpoints", () => {
+  describe("GET /api/v1/entities/:entitySlug/projects/:projectId/endpoints", () => {
     it("should return empty array when no endpoints exist", async () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`
       );
       expect(res.status).toBe(200);
 
@@ -60,7 +73,7 @@ describe("Endpoints Routes", () => {
       await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "extract-data",
@@ -73,7 +86,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`
       );
       expect(res.status).toBe(200);
 
@@ -83,12 +96,12 @@ describe("Endpoints Routes", () => {
     });
   });
 
-  describe("POST /api/v1/users/:userId/projects/:projectId/endpoints", () => {
+  describe("POST /api/v1/entities/:entitySlug/projects/:projectId/endpoints", () => {
     it("should create endpoint with schemas", async () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "extract-person",
@@ -125,7 +138,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "get-info",
@@ -147,7 +160,7 @@ describe("Endpoints Routes", () => {
       await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "unique-endpoint",
@@ -161,7 +174,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "unique-endpoint",
@@ -178,7 +191,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "no-key",
@@ -194,7 +207,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "bad-key",
@@ -209,13 +222,13 @@ describe("Endpoints Routes", () => {
     });
   });
 
-  describe("GET /api/v1/users/:userId/projects/:projectId/endpoints/:endpointId", () => {
+  describe("GET /api/v1/entities/:entitySlug/projects/:projectId/endpoints/:endpointId", () => {
     it("should return a specific endpoint", async () => {
       // Create endpoint first
       const createRes = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "test-endpoint",
@@ -230,7 +243,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints/${endpointId}`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints/${endpointId}`
       );
       expect(res.status).toBe(200);
 
@@ -243,19 +256,19 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints/00000000-0000-0000-0000-000000000000`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints/00000000-0000-0000-0000-000000000000`
       );
       expect(res.status).toBe(404);
     });
   });
 
-  describe("PUT /api/v1/users/:userId/projects/:projectId/endpoints/:endpointId", () => {
+  describe("PUT /api/v1/entities/:entitySlug/projects/:projectId/endpoints/:endpointId", () => {
     it("should update endpoint display_name", async () => {
       // Create endpoint first
       const createRes = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "test-endpoint",
@@ -270,7 +283,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "PUT",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints/${endpointId}`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints/${endpointId}`,
         {
           body: {
             display_name: "Updated Name",
@@ -289,7 +302,7 @@ describe("Endpoints Routes", () => {
       const createRes = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "test-endpoint",
@@ -311,7 +324,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "PUT",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints/${endpointId}`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints/${endpointId}`,
         {
           body: {
             output_schema: newSchema,
@@ -330,7 +343,7 @@ describe("Endpoints Routes", () => {
       const createRes = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "test-endpoint",
@@ -345,7 +358,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "PUT",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints/${endpointId}`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints/${endpointId}`,
         {
           body: {
             is_active: false,
@@ -360,13 +373,13 @@ describe("Endpoints Routes", () => {
     });
   });
 
-  describe("DELETE /api/v1/users/:userId/projects/:projectId/endpoints/:endpointId", () => {
+  describe("DELETE /api/v1/entities/:entitySlug/projects/:projectId/endpoints/:endpointId", () => {
     it("should delete an endpoint", async () => {
       // Create endpoint first
       const createRes = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "test-endpoint",
@@ -381,7 +394,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "DELETE",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints/${endpointId}`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints/${endpointId}`
       );
       expect(res.status).toBe(200);
 
@@ -389,7 +402,7 @@ describe("Endpoints Routes", () => {
       const getRes = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints/${endpointId}`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints/${endpointId}`
       );
       expect(getRes.status).toBe(404);
     });
@@ -398,7 +411,7 @@ describe("Endpoints Routes", () => {
       const res = await createTestRequest(
         app,
         "DELETE",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints/00000000-0000-0000-0000-000000000000`
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints/00000000-0000-0000-0000-000000000000`
       );
       expect(res.status).toBe(404);
     });

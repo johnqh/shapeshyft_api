@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { createTestApp, createTestRequest, testUser } from "./utils";
-import { cleanupTestUser, createTestUsageAnalytics, getTestUser } from "./utils/test-db";
-import { initDatabase, db, usageAnalytics } from "../src/db";
+import { cleanupTestUser, createTestUserWithEntity, createTestUsageAnalytics } from "./utils/test-db";
+import { initDatabase } from "../src/db";
+import type { Hono } from "hono";
 
 describe("Analytics Routes", () => {
-  const app = createTestApp();
-  const userId = testUser.uid;
+  let app: Hono;
+  let entitySlug: string;
+  let userId: string;
   let projectId: string;
   let keyId: string;
   let endpointId: string;
@@ -15,10 +17,16 @@ describe("Analytics Routes", () => {
   });
 
   beforeEach(async () => {
-    await cleanupTestUser(userId);
+    await cleanupTestUser(testUser.uid);
+    // Create user with entity for each test
+    const { user, entity } = await createTestUserWithEntity(testUser);
+    userId = user.id;
+    entitySlug = entity.entity_slug;
+    // Create app with the user's ID
+    app = createTestApp(testUser, userId);
 
-    // Create key, project, and endpoint for analytics tests
-    const keyRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/keys`, {
+    // Create key, project, and endpoint for analytics tests using entity routes
+    const keyRes = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
       body: {
         key_name: "Test Key",
         provider: "openai",
@@ -28,19 +36,24 @@ describe("Analytics Routes", () => {
     const keyJson = await keyRes.json();
     keyId = keyJson.data.uuid;
 
-    const projectRes = await createTestRequest(app, "POST", `/api/v1/users/${userId}/projects`, {
-      body: {
-        project_name: "test-project",
-        display_name: "Test Project",
-      },
-    });
+    const projectRes = await createTestRequest(
+      app,
+      "POST",
+      `/api/v1/entities/${entitySlug}/projects`,
+      {
+        body: {
+          project_name: "test-project",
+          display_name: "Test Project",
+        },
+      }
+    );
     const projectJson = await projectRes.json();
     projectId = projectJson.data.uuid;
 
     const endpointRes = await createTestRequest(
       app,
       "POST",
-      `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+      `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
       {
         body: {
           endpoint_name: "test-endpoint",
@@ -54,7 +67,7 @@ describe("Analytics Routes", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestUser(userId);
+    await cleanupTestUser(testUser.uid);
   });
 
   describe("GET /api/v1/users/:userId/analytics", () => {
@@ -118,7 +131,7 @@ describe("Analytics Routes", () => {
       const endpoint2Res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "second-endpoint",
@@ -181,7 +194,7 @@ describe("Analytics Routes", () => {
       const endpoint2Res = await createTestRequest(
         app,
         "POST",
-        `/api/v1/users/${userId}/projects/${projectId}/endpoints`,
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
         {
           body: {
             endpoint_name: "second-endpoint",
@@ -230,7 +243,11 @@ describe("Analytics Routes", () => {
     });
 
     it("should reject access to other user's analytics", async () => {
-      const res = await createTestRequest(app, "GET", `/api/v1/users/other-user-id/analytics`);
+      const res = await createTestRequest(
+        app,
+        "GET",
+        `/api/v1/users/00000000-0000-0000-0000-000000000000/analytics`
+      );
       expect(res.status).toBe(403);
     });
   });

@@ -57,15 +57,15 @@ settingsRouter.get("/", async c => {
   const rows = await db
     .select()
     .from(userSettings)
-    .where(eq(userSettings.user_id, user.uuid));
+    .where(eq(userSettings.user_id, user.id));
 
   if (rows.length === 0) {
     // Return default settings with auto-generated org path
     const defaultSettings: UserSettings = {
-      uuid: null,
-      user_id: user.uuid,
+      id: null,
+      user_id: user.id,
       organization_name: null,
-      organization_path: generateDefaultOrgPath(user.uuid),
+      organization_path: generateDefaultOrgPath(user.id),
       is_default: true,
       created_at: null,
       updated_at: null,
@@ -93,7 +93,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
   const existing = await db
     .select()
     .from(userSettings)
-    .where(eq(userSettings.user_id, user.uuid));
+    .where(eq(userSettings.user_id, user.id));
 
   // If changing organization_path, check for duplicates
   if (body.organization_path) {
@@ -104,7 +104,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
 
     if (
       duplicate.length > 0 &&
-      (existing.length === 0 || duplicate[0]!.user_id !== user.uuid)
+      (existing.length === 0 || duplicate[0]!.user_id !== user.id)
     ) {
       return c.json(errorResponse("Organization path already taken"), 409);
     }
@@ -112,7 +112,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
 
   if (existing.length === 0) {
     // Create new settings
-    const orgPath = body.organization_path || generateDefaultOrgPath(user.uuid);
+    const orgPath = body.organization_path || generateDefaultOrgPath(user.id);
 
     // Double-check the auto-generated path isn't taken
     if (!body.organization_path) {
@@ -134,7 +134,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
     const rows = await db
       .insert(userSettings)
       .values({
-        user_id: user.uuid,
+        user_id: user.id,
         organization_name: body.organization_name ?? null,
         organization_path: orgPath,
       })
@@ -153,7 +153,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
       organization_path: body.organization_path ?? current.organization_path,
       updated_at: new Date(),
     })
-    .where(eq(userSettings.user_id, user.uuid))
+    .where(eq(userSettings.user_id, user.id))
     .returning();
 
   const updated: UserSettings = { ...rows[0]!, is_default: false };

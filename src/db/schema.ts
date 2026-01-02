@@ -11,6 +11,11 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createRateLimitCountersTable } from "@sudobility/ratelimit_service";
+import {
+  createEntitiesTable,
+  createEntityMembersTable,
+  createEntityInvitationsTable,
+} from "@sudobility/entity_service";
 
 // Create the shapeshyft schema
 export const shapeshyftSchema = pgSchema("shapeshyft");
@@ -33,7 +38,7 @@ export const httpMethodEnum = pgEnum("http_method", ["GET", "POST"]);
 // =============================================================================
 
 export const users = shapeshyftSchema.table("users", {
-  uuid: uuid("uuid").primaryKey().defaultRandom(),
+  id: uuid("id").primaryKey().defaultRandom(),
   firebase_uid: varchar("firebase_uid", { length: 128 }).notNull().unique(),
   email: varchar("email", { length: 255 }),
   display_name: varchar("display_name", { length: 255 }),
@@ -46,10 +51,10 @@ export const users = shapeshyftSchema.table("users", {
 // =============================================================================
 
 export const userSettings = shapeshyftSchema.table("user_settings", {
-  uuid: uuid("uuid").primaryKey().defaultRandom(),
+  id: uuid("id").primaryKey().defaultRandom(),
   user_id: uuid("user_id")
     .notNull()
-    .references(() => users.uuid, { onDelete: "cascade" })
+    .references(() => users.id, { onDelete: "cascade" })
     .unique(),
   organization_name: varchar("organization_name", { length: 255 }),
   organization_path: varchar("organization_path", { length: 255 })
@@ -60,14 +65,29 @@ export const userSettings = shapeshyftSchema.table("user_settings", {
 });
 
 // =============================================================================
+// Entity Tables (from @sudobility/entity_service)
+// Must be defined before tables that reference them
+// =============================================================================
+
+export const entities = createEntitiesTable(shapeshyftSchema, "shapeshyft");
+export const entityMembers = createEntityMembersTable(
+  shapeshyftSchema,
+  "shapeshyft"
+);
+export const entityInvitations = createEntityInvitationsTable(
+  shapeshyftSchema,
+  "shapeshyft"
+);
+
+// =============================================================================
 // LLM API Keys Table
 // =============================================================================
 
 export const llmApiKeys = shapeshyftSchema.table("llm_api_keys", {
   uuid: uuid("uuid").primaryKey().defaultRandom(),
-  user_id: uuid("user_id")
+  entity_id: uuid("entity_id")
     .notNull()
-    .references(() => users.uuid, { onDelete: "cascade" }),
+    .references(() => entities.id, { onDelete: "cascade" }),
   key_name: varchar("key_name", { length: 255 }).notNull(),
   provider: llmProviderEnum("provider").notNull(),
   encrypted_api_key: text("encrypted_api_key"),
@@ -86,9 +106,9 @@ export const projects = shapeshyftSchema.table(
   "projects",
   {
     uuid: uuid("uuid").primaryKey().defaultRandom(),
-    user_id: uuid("user_id")
+    entity_id: uuid("entity_id")
       .notNull()
-      .references(() => users.uuid, { onDelete: "cascade" }),
+      .references(() => entities.id, { onDelete: "cascade" }),
     project_name: varchar("project_name", { length: 255 }).notNull(),
     display_name: varchar("display_name", { length: 255 }).notNull(),
     description: text("description"),
@@ -102,8 +122,8 @@ export const projects = shapeshyftSchema.table(
     updated_at: timestamp("updated_at").defaultNow(),
   },
   table => ({
-    uniqueProjectPerUser: uniqueIndex("unique_project_per_user").on(
-      table.user_id,
+    uniqueProjectPerEntity: uniqueIndex("unique_project_per_entity").on(
+      table.entity_id,
       table.project_name
     ),
   })
@@ -171,3 +191,4 @@ export const rateLimitCounters = createRateLimitCountersTable(
   shapeshyftSchema,
   "shapeshyft"
 );
+

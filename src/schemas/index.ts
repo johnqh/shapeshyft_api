@@ -13,19 +13,23 @@ export const userIdParamSchema = z.object({
 });
 
 export const keyIdParamSchema = z.object({
-  userId: z.string().min(1).max(128),
+  entitySlug: z.string().min(1).max(12),
   keyId: z.string().uuid(),
 });
 
 export const projectIdParamSchema = z.object({
-  userId: z.string().min(1).max(128),
+  entitySlug: z.string().min(1).max(12),
   projectId: z.string().uuid(),
 });
 
 export const endpointIdParamSchema = z.object({
-  userId: z.string().min(1).max(128),
+  entitySlug: z.string().min(1).max(12),
   projectId: z.string().uuid(),
   endpointId: z.string().uuid(),
+});
+
+export const entitySlugParamSchema = z.object({
+  entitySlug: z.string().min(1).max(12),
 });
 
 export const aiParamSchema = z.object({

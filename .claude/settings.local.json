@@ -32,7 +32,12 @@
       "Bash(git commit:*)",
       "Bash(git push)",
       "Bash(docker login:*)",
-      "Bash(npm search:*)"
+      "Bash(npm search:*)",
+      "Bash(NODE_ENV=test bun run:*)",
+      "Bash(DATABASE_URL=\"postgres://localhost/shapeshyft_test\" bun -e:*)",
+      "Bash(NODE_ENV=test bun test:*)",
+      "Bash(NODE_ENV=test bun:*)",
+      "Bash(echo:*)"
     ]
   }
 }

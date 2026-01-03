@@ -29,15 +29,14 @@ analyticsRouter.get(
   "/",
   zValidator("query", analyticsQuerySchema),
   async c => {
-    const authenticatedUserId = c.get("userId");
-    const requestedUserId = c.req.param("userId");
+    const userId = c.get("userId"); // Internal DB UUID
+    const firebaseUser = c.get("firebaseUser");
+    const requestedUserId = c.req.param("userId"); // Firebase UID from URL
 
-    // Users can only view their own analytics
-    if (requestedUserId !== authenticatedUserId) {
+    // Users can only view their own analytics (compare Firebase UIDs)
+    if (requestedUserId !== firebaseUser.uid) {
       return c.json({ success: false, error: "Access denied" }, 403);
     }
-
-    const userId = authenticatedUserId;
     const query = c.req.valid("query");
 
     // Get all entities the user is a member of

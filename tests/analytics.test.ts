@@ -72,7 +72,7 @@ describe("Analytics Routes", () => {
 
   describe("GET /api/v1/users/:userId/analytics", () => {
     it("should return empty analytics when no usage exists", async () => {
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/analytics`);
+      const res = await createTestRequest(app, "GET", `/api/v1/users/${testUser.uid}/analytics`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -105,7 +105,7 @@ describe("Analytics Routes", () => {
         latency_ms: 100,
       });
 
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/analytics`);
+      const res = await createTestRequest(app, "GET", `/api/v1/users/${testUser.uid}/analytics`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -151,7 +151,7 @@ describe("Analytics Routes", () => {
         estimated_cost_cents: 20,
       });
 
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${userId}/analytics`);
+      const res = await createTestRequest(app, "GET", `/api/v1/users/${testUser.uid}/analytics`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -175,7 +175,7 @@ describe("Analytics Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/analytics?start_date=${today}&end_date=${today}`
+        `/api/v1/users/${testUser.uid}/analytics?start_date=${today}&end_date=${today}`
       );
       expect(res.status).toBe(200);
 
@@ -215,7 +215,7 @@ describe("Analytics Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/analytics?endpoint_id=${endpointId}`
+        `/api/v1/users/${testUser.uid}/analytics?endpoint_id=${endpointId}`
       );
       expect(res.status).toBe(200);
 
@@ -234,7 +234,7 @@ describe("Analytics Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${userId}/analytics?project_id=${projectId}`
+        `/api/v1/users/${testUser.uid}/analytics?project_id=${projectId}`
       );
       expect(res.status).toBe(200);
 

@@ -39,7 +39,8 @@
       "Bash(NODE_ENV=test bun:*)",
       "Bash(echo:*)",
       "Bash(bun run test:run:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(bun run:*)"
     ]
   }
 }

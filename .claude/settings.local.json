@@ -37,7 +37,9 @@
       "Bash(DATABASE_URL=\"postgres://localhost/shapeshyft_test\" bun -e:*)",
       "Bash(NODE_ENV=test bun test:*)",
       "Bash(NODE_ENV=test bun:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(bun run test:run:*)",
+      "Bash(ls:*)"
     ]
   }
 }

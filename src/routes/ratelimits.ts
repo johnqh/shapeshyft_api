@@ -8,9 +8,18 @@ import {
   type RateLimitsConfigResponse,
   type RateLimitHistoryResponse,
 } from "@sudobility/types";
-import { getRateLimitRouteHandler } from "../middleware/rateLimit";
+import { getRateLimitRouteHandler, rateLimitsConfig } from "../middleware/rateLimit";
+import { getEnv } from "../lib/env-helper";
 
 const ratelimitsRouter = new Hono();
+
+/**
+ * Check if RevenueCat is configured
+ */
+function isRevenueCatConfigured(): boolean {
+  const key = getEnv("REVENUECAT_API_KEY");
+  return !!key && key.length > 0;
+}
 
 /**
  * GET /ratelimits
@@ -20,6 +29,21 @@ const ratelimitsRouter = new Hono();
  */
 ratelimitsRouter.get("/", async c => {
   try {
+    // If RevenueCat is not configured, return static config without usage data
+    if (!isRevenueCatConfigured()) {
+      const noneLimits = rateLimitsConfig.none;
+      return c.json(successResponse({
+        tiers: rateLimitsConfig,
+        currentEntitlement: "none",
+        currentLimits: noneLimits,
+        currentUsage: {
+          hourly: { used: 0, limit: noneLimits.hourly ?? 0, remaining: noneLimits.hourly ?? 0 },
+          daily: { used: 0, limit: noneLimits.daily ?? 0, remaining: noneLimits.daily ?? 0 },
+          monthly: { used: 0, limit: noneLimits.monthly ?? 0, remaining: noneLimits.monthly ?? 0 },
+        },
+      }));
+    }
+
     const firebaseUser = c.get("firebaseUser");
     const data = await getRateLimitRouteHandler().getRateLimitsConfigData(
       firebaseUser.uid
@@ -49,6 +73,15 @@ ratelimitsRouter.get("/history/:periodType", async c => {
         ),
         400
       );
+    }
+
+    // If RevenueCat is not configured, return empty history
+    if (!isRevenueCatConfigured()) {
+      return c.json(successResponse({
+        periodType: periodTypeParam as RateLimitPeriodType,
+        entries: [],
+        totalEntries: 0,
+      }));
     }
 
     const periodType = periodTypeParam as RateLimitPeriodType;

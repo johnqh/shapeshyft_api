@@ -7,7 +7,7 @@
         "@anthropic-ai/sdk": "^0.39.0",
         "@google/generative-ai": "^0.21.0",
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/entity_service": "^1.0.1",
+        "@sudobility/entity_service": "^1.0.2",
         "@sudobility/ratelimit_service": "^1.0.4",
         "@sudobility/shapeshyft_types": "^1.0.13",
         "@sudobility/types": "^1.9.40",
@@ -132,7 +132,7 @@
 
     "@rtsao/scc": ["@rtsao/scc@1.1.0", "", {}, ""],
 
-    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.1", "", { "peerDependencies": { "@sudobility/types": "^1.9.40", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-aHWQWMiaEXPS4NrZRWI4xpHElnu93uduUEyqBTlnrNV1qPRBgOrj9LzUnD96FFLDIEJ5aPdI3HY4j3h56n9yEw=="],
+    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.2", "", { "peerDependencies": { "@sudobility/types": "^1.9.40", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-B8nsWIBgPC83oObvfcNKK1Sr8d7XdfImmmxAmYovgFCGYmn32HWk/zkFED3SRf6iAlg2k5WCzmtSARHua3xO0Q=="],
 
     "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.4", "", { "peerDependencies": { "@sudobility/types": "^1.9.40", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-iU1yGzUhqUjQWhfg2bd91kQC5/mcGazSykZO375iB+7kKe3OzKytMREuhC0c+ZnqnI7WjsN62O9qEt+f4ylsoQ=="],
 

@@ -8,7 +8,11 @@ import {
   llmApiKeys,
   usageAnalytics,
   entities,
+  entityMembers,
+  users,
+  rateLimitCounters,
 } from "../db";
+import { rateLimitsConfig } from "../middleware/rateLimit";
 import { aiParamSchema } from "../schemas";
 import {
   successResponse,
@@ -26,6 +30,12 @@ import {
   validateProjectApiKey,
   isValidApiKeyFormat,
 } from "../lib/api-key";
+import { getEnv } from "../lib/env-helper";
+import {
+  RevenueCatHelper,
+  EntitlementHelper,
+  RateLimitChecker,
+} from "@sudobility/ratelimit_service";
 
 const aiRouter = new Hono();
 
@@ -35,6 +45,7 @@ const aiRouter = new Hono();
 
 interface ValidatedContext {
   success: true;
+  entity: typeof entities.$inferSelect;
   project: typeof projects.$inferSelect;
   endpoint: typeof endpoints.$inferSelect;
   llmKey: typeof llmApiKeys.$inferSelect;
@@ -127,6 +138,97 @@ async function findEntityBySlug(
     .where(eq(entities.entity_slug, entitySlug));
 
   return entityRows[0] ?? null;
+}
+
+/**
+ * Get the Firebase UID of the entity admin (for rate limiting).
+ * Returns null if no admin is found.
+ */
+async function getEntityAdminFirebaseUid(
+  entityId: string
+): Promise<string | null> {
+  const result = await db
+    .select({ firebase_uid: users.firebase_uid })
+    .from(entityMembers)
+    .innerJoin(users, eq(entityMembers.user_id, users.id))
+    .where(and(eq(entityMembers.entity_id, entityId), eq(entityMembers.role, "admin")))
+    .limit(1);
+
+  return result[0]?.firebase_uid ?? null;
+}
+
+// Lazy-initialized rate limit helpers
+let _revenueCatHelper: RevenueCatHelper | null = null;
+let _entitlementHelper: EntitlementHelper | null = null;
+let _rateLimitChecker: RateLimitChecker | null = null;
+
+function getRevenueCatHelper(): RevenueCatHelper | null {
+  const apiKey = getEnv("REVENUECAT_API_KEY");
+  if (!apiKey) return null;
+  if (!_revenueCatHelper) {
+    _revenueCatHelper = new RevenueCatHelper({ apiKey });
+  }
+  return _revenueCatHelper;
+}
+
+function getEntitlementHelper(): EntitlementHelper {
+  if (!_entitlementHelper) {
+    _entitlementHelper = new EntitlementHelper(rateLimitsConfig);
+  }
+  return _entitlementHelper;
+}
+
+function getRateLimitChecker(): RateLimitChecker {
+  if (!_rateLimitChecker) {
+    _rateLimitChecker = new RateLimitChecker({
+      db: db as any,
+      table: rateLimitCounters as any,
+    });
+  }
+  return _rateLimitChecker;
+}
+
+/**
+ * Check and increment rate limits for an AI request.
+ * Returns null if allowed, or an error response if rate limited.
+ */
+async function checkRateLimit(
+  c: any,
+  firebaseUid: string
+): Promise<Response | null> {
+  const rcHelper = getRevenueCatHelper();
+  if (!rcHelper) {
+    // RevenueCat not configured - skip rate limiting
+    return null;
+  }
+
+  try {
+    const subscriptionInfo = await rcHelper.getSubscriptionInfo(firebaseUid);
+    const limits = getEntitlementHelper().getRateLimits(subscriptionInfo.entitlements);
+    const result = await getRateLimitChecker().checkAndIncrement(
+      firebaseUid,
+      limits,
+      subscriptionInfo.subscriptionStartedAt
+    );
+
+    if (!result.allowed) {
+      return c.json(
+        errorResponse(
+          `Rate limit exceeded (${result.exceededLimit ?? "unknown"} limit). ` +
+          `Remaining: hourly=${result.remaining.hourly ?? "∞"}, ` +
+          `daily=${result.remaining.daily ?? "∞"}, ` +
+          `monthly=${result.remaining.monthly ?? "∞"}`
+        ),
+        429
+      );
+    }
+
+    return null; // Allowed
+  } catch (error) {
+    // Log error but don't block request on rate limit check failure
+    console.error("Rate limit check failed:", error);
+    return null;
+  }
 }
 
 /**
@@ -297,6 +399,7 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
 
   return {
     success: true,
+    entity,
     project,
     endpoint,
     llmKey,
@@ -317,7 +420,16 @@ async function handlePromptRequest(c: any) {
     return context.response;
   }
 
-  const { endpoint, llmKey, inputData } = context;
+  const { entity, endpoint, llmKey, inputData } = context;
+
+  // Check rate limits using entity admin's subscription
+  const adminFirebaseUid = await getEntityAdminFirebaseUid(entity.id);
+  if (adminFirebaseUid) {
+    const rateLimitResponse = await checkRateLimit(c, adminFirebaseUid);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+  }
 
   // Generate the combined prompt using ApiHelper
   const prompt = ApiHelper.prompt({
@@ -350,7 +462,16 @@ async function handleAIRequest(c: any) {
     return context.response;
   }
 
-  const { endpoint, llmKey, inputData } = context;
+  const { entity, endpoint, llmKey, inputData } = context;
+
+  // Check rate limits using entity admin's subscription
+  const adminFirebaseUid = await getEntityAdminFirebaseUid(entity.id);
+  if (adminFirebaseUid) {
+    const rateLimitResponse = await checkRateLimit(c, adminFirebaseUid);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+  }
 
   // Build the prompts for LLM call (providers expect system/user format)
   const prompts = ApiHelper.buildLegacyPrompts({

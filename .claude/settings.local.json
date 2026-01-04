@@ -40,7 +40,9 @@
       "Bash(echo:*)",
       "Bash(bun run test:run:*)",
       "Bash(ls:*)",
-      "Bash(bun run:*)"
+      "Bash(bun run:*)",
+      "Bash(source:*)",
+      "Bash(source .env)"
     ]
   }
 }

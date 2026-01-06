@@ -11,16 +11,17 @@ import { getRequiredEnv } from "../lib/env-helper";
  * Rate limit configuration for shapeshyft_api
  *
  * - none: Free tier users (no subscription)
- * - shapeshyft: Users with shapeshyft entitlement
- * - pro: Pro users with higher limits
- * - enterprise: Enterprise users with unlimited access
+ * - bandwidth_dev: Users with dev bandwidth entitlement
+ * - bandwidth_pro: Pro users with higher limits
+ * - bandwidth_ultra: Enterprise users with unlimited access
  */
 export const rateLimitsConfig: RateLimitsConfig = {
-  none: { hourly: 10, daily: 50, monthly: 200 },
-  shapeshyft: { hourly: 100, daily: 1000, monthly: 10000 },
-  pro: { hourly: 500, daily: 5000, monthly: 50000 },
-  enterprise: { hourly: undefined, daily: undefined, monthly: undefined },
+  none: { hourly: 10, daily: 120, monthly: 1800 },
+  bandwidth_dev: { hourly: 100, daily: 1200, monthly: 18000 },
+  bandwidth_pro: { hourly: 800, daily: 10000, monthly: 150000 },
+  bandwidth_ultra: { hourly: undefined, daily: undefined, monthly: undefined },
 };
+
 
 // Lazy-initialized instances to avoid requiring env vars at module load time
 let _rateLimitRouteHandler: RateLimitRouteHandler | null = null;
@@ -40,9 +41,9 @@ export function getRateLimitRouteHandler(): RateLimitRouteHandler {
       rateLimitsTable: rateLimitCounters as any,
       entitlementDisplayNames: {
         none: "Free",
-        shapeshyft: "ShapeShyft",
-        pro: "Pro",
-        enterprise: "Enterprise",
+        bandwidth_dev: "Developer",
+        bandwidth_pro: "Pro",
+        bandwidth_ultra: "Ultra",
       },
     });
   }

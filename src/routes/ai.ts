@@ -159,10 +159,20 @@ async function getEntityAdminFirebaseUid(
 
 // Lazy-initialized rate limit helpers
 let _revenueCatHelper: RevenueCatHelper | null = null;
+let _revenueCatHelperSandbox: RevenueCatHelper | null = null;
 let _entitlementHelper: EntitlementHelper | null = null;
 let _rateLimitChecker: RateLimitChecker | null = null;
 
-function getRevenueCatHelper(): RevenueCatHelper | null {
+function getRevenueCatHelper(testMode: boolean = false): RevenueCatHelper | null {
+  if (testMode) {
+    const apiKey = getEnv("REVENUECAT_API_KEY_SANDBOX");
+    if (!apiKey) return null;
+    if (!_revenueCatHelperSandbox) {
+      _revenueCatHelperSandbox = new RevenueCatHelper({ apiKey });
+    }
+    return _revenueCatHelperSandbox;
+  }
+
   const apiKey = getEnv("REVENUECAT_API_KEY");
   if (!apiKey) return null;
   if (!_revenueCatHelper) {
@@ -189,6 +199,15 @@ function getRateLimitChecker(): RateLimitChecker {
 }
 
 /**
+ * Extract testMode from URL query parameter
+ */
+function getTestMode(c: any): boolean {
+  const url = new URL(c.req.url);
+  const testMode = url.searchParams.get("testMode");
+  return testMode === "true";
+}
+
+/**
  * Check and increment rate limits for an AI request.
  * Returns null if allowed, or an error response if rate limited.
  */
@@ -196,7 +215,8 @@ async function checkRateLimit(
   c: any,
   firebaseUid: string
 ): Promise<Response | null> {
-  const rcHelper = getRevenueCatHelper();
+  const testMode = getTestMode(c);
+  const rcHelper = getRevenueCatHelper(testMode);
   if (!rcHelper) {
     // RevenueCat not configured - skip rate limiting
     return null;

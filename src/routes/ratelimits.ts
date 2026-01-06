@@ -14,10 +14,21 @@ import { getEnv } from "../lib/env-helper";
 const ratelimitsRouter = new Hono();
 
 /**
+ * Extract testMode from URL query parameter
+ */
+function getTestMode(c: any): boolean {
+  const url = new URL(c.req.url);
+  const testMode = url.searchParams.get("testMode");
+  return testMode === "true";
+}
+
+/**
  * Check if RevenueCat is configured
  */
-function isRevenueCatConfigured(): boolean {
-  const key = getEnv("REVENUECAT_API_KEY");
+function isRevenueCatConfigured(testMode: boolean = false): boolean {
+  const key = testMode
+    ? getEnv("REVENUECAT_API_KEY_SANDBOX")
+    : getEnv("REVENUECAT_API_KEY");
   return !!key && key.length > 0;
 }
 
@@ -29,8 +40,10 @@ function isRevenueCatConfigured(): boolean {
  */
 ratelimitsRouter.get("/", async c => {
   try {
+    const testMode = getTestMode(c);
+
     // If RevenueCat is not configured, return static config without usage data
-    if (!isRevenueCatConfigured()) {
+    if (!isRevenueCatConfigured(testMode)) {
       const noneLimits = rateLimitsConfig.none;
       return c.json(successResponse({
         tiers: rateLimitsConfig,
@@ -45,7 +58,7 @@ ratelimitsRouter.get("/", async c => {
     }
 
     const firebaseUser = c.get("firebaseUser");
-    const data = await getRateLimitRouteHandler().getRateLimitsConfigData(
+    const data = await getRateLimitRouteHandler(testMode).getRateLimitsConfigData(
       firebaseUser.uid
     );
 
@@ -63,6 +76,7 @@ ratelimitsRouter.get("/", async c => {
  */
 ratelimitsRouter.get("/history/:periodType", async c => {
   try {
+    const testMode = getTestMode(c);
     const periodTypeParam = c.req.param("periodType");
 
     // Validate period type
@@ -76,7 +90,7 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     }
 
     // If RevenueCat is not configured, return empty history
-    if (!isRevenueCatConfigured()) {
+    if (!isRevenueCatConfigured(testMode)) {
       return c.json(successResponse({
         periodType: periodTypeParam as RateLimitPeriodType,
         entries: [],
@@ -87,7 +101,7 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     const periodType = periodTypeParam as RateLimitPeriodType;
     const firebaseUser = c.get("firebaseUser");
 
-    const data = await getRateLimitRouteHandler().getRateLimitHistoryData(
+    const data = await getRateLimitRouteHandler(testMode).getRateLimitHistoryData(
       firebaseUser.uid,
       periodType
     );

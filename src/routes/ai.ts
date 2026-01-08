@@ -8,8 +8,6 @@ import {
   llmApiKeys,
   usageAnalytics,
   entities,
-  entityMembers,
-  users,
   rateLimitCounters,
 } from "../db";
 import { rateLimitsConfig } from "../middleware/rateLimit";
@@ -140,22 +138,6 @@ async function findEntityBySlug(
   return entityRows[0] ?? null;
 }
 
-/**
- * Get the Firebase UID of the entity admin (for rate limiting).
- * Returns null if no admin is found.
- */
-async function getEntityAdminFirebaseUid(
-  entityId: string
-): Promise<string | null> {
-  const result = await db
-    .select({ firebase_uid: users.firebase_uid })
-    .from(entityMembers)
-    .innerJoin(users, eq(entityMembers.user_id, users.id))
-    .where(and(eq(entityMembers.entity_id, entityId), eq(entityMembers.role, "admin")))
-    .limit(1);
-
-  return result[0]?.firebase_uid ?? null;
-}
 
 // Lazy-initialized rate limit helpers
 let _revenueCatHelper: RevenueCatHelper | null = null;
@@ -209,11 +191,12 @@ function getTestMode(c: any): boolean {
 
 /**
  * Check and increment rate limits for an AI request.
+ * Rate limits are per entity (personal or organizational).
  * Returns null if allowed, or an error response if rate limited.
  */
 async function checkRateLimit(
   c: any,
-  firebaseUid: string
+  entityId: string
 ): Promise<Response | null> {
   const testMode = getTestMode(c);
   const rcHelper = getRevenueCatHelper(testMode);
@@ -223,10 +206,11 @@ async function checkRateLimit(
   }
 
   try {
-    const subscriptionInfo = await rcHelper.getSubscriptionInfo(firebaseUid);
+    // Use entityId as RevenueCat subscriber ID
+    const subscriptionInfo = await rcHelper.getSubscriptionInfo(entityId);
     const limits = getEntitlementHelper().getRateLimits(subscriptionInfo.entitlements);
     const result = await getRateLimitChecker().checkAndIncrement(
-      firebaseUid,
+      entityId,
       limits,
       subscriptionInfo.subscriptionStartedAt
     );
@@ -442,13 +426,10 @@ async function handlePromptRequest(c: any) {
 
   const { entity, endpoint, llmKey, inputData } = context;
 
-  // Check rate limits using entity admin's subscription
-  const adminFirebaseUid = await getEntityAdminFirebaseUid(entity.id);
-  if (adminFirebaseUid) {
-    const rateLimitResponse = await checkRateLimit(c, adminFirebaseUid);
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
+  // Check rate limits using entity's subscription
+  const rateLimitResponse = await checkRateLimit(c, entity.id);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   // Generate the combined prompt using ApiHelper
@@ -484,13 +465,10 @@ async function handleAIRequest(c: any) {
 
   const { entity, endpoint, llmKey, inputData } = context;
 
-  // Check rate limits using entity admin's subscription
-  const adminFirebaseUid = await getEntityAdminFirebaseUid(entity.id);
-  if (adminFirebaseUid) {
-    const rateLimitResponse = await checkRateLimit(c, adminFirebaseUid);
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
+  // Check rate limits using entity's subscription
+  const rateLimitResponse = await checkRateLimit(c, entity.id);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   // Build the prompts for LLM call (providers expect system/user format)

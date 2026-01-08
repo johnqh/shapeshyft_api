@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import {
   successResponse,
   errorResponse,
@@ -10,6 +11,7 @@ import {
 } from "@sudobility/types";
 import { getRateLimitRouteHandler, rateLimitsConfig } from "../middleware/rateLimit";
 import { getEnv } from "../lib/env-helper";
+import { db, entities, entityMembers } from "../db";
 
 const ratelimitsRouter = new Hono();
 
@@ -33,9 +35,53 @@ function isRevenueCatConfigured(testMode: boolean = false): boolean {
 }
 
 /**
+ * Verify user has access to entity and return its ID.
+ * entitySlug is required - passed from the app based on current dashboard context.
+ */
+async function getEntityIdForRateLimits(
+  c: any,
+  firebaseUid: string
+): Promise<{ entityId: string | null; error: string | null }> {
+  const url = new URL(c.req.url);
+  const entitySlug = url.searchParams.get("entitySlug");
+
+  if (!entitySlug) {
+    return { entityId: null, error: "entitySlug is required" };
+  }
+
+  // Look up entity by slug
+  const entityRows = await db
+    .select()
+    .from(entities)
+    .where(eq(entities.entity_slug, entitySlug));
+
+  if (entityRows.length === 0) {
+    return { entityId: null, error: "Entity not found" };
+  }
+
+  const entity = entityRows[0]!;
+
+  // Verify user has access to this entity
+  const memberRows = await db
+    .select()
+    .from(entityMembers)
+    .where(eq(entityMembers.entity_id, entity.id));
+
+  const isMember = memberRows.some((m) => m.firebase_uid === firebaseUid);
+  if (!isMember) {
+    return { entityId: null, error: "Access denied to entity" };
+  }
+
+  return { entityId: entity.id, error: null };
+}
+
+/**
  * GET /ratelimits
  * Returns rate limit configurations for all entitlement tiers
- * and the current user's usage.
+ * and the current entity's usage.
+ * Query params:
+ *   - entitySlug: Required. The entity slug to get rate limits for.
+ *   - testMode: Optional, set to "true" for sandbox mode.
  * Note: Firebase auth is applied at the admin routes level.
  */
 ratelimitsRouter.get("/", async c => {
@@ -58,8 +104,22 @@ ratelimitsRouter.get("/", async c => {
     }
 
     const firebaseUser = c.get("firebaseUser");
-    const data = await getRateLimitRouteHandler(testMode).getRateLimitsConfigData(
+
+    // Get entity ID for rate limit lookup
+    const { entityId, error: entityError } = await getEntityIdForRateLimits(
+      c,
       firebaseUser.uid
+    );
+
+    if (entityError || !entityId) {
+      const status = entityError === "entitySlug is required" ? 400 :
+                     entityError === "Access denied to entity" ? 403 : 404;
+      return c.json(errorResponse(entityError || "Entity not found"), status);
+    }
+
+    // Use entity ID for rate limits (subscriptions are per-entity)
+    const data = await getRateLimitRouteHandler(testMode).getRateLimitsConfigData(
+      entityId
     );
 
     return c.json(successResponse(data) as RateLimitsConfigResponse);
@@ -73,6 +133,9 @@ ratelimitsRouter.get("/", async c => {
  * GET /ratelimits/history/:periodType
  * Returns usage history for a specific period type.
  * periodType can be: hour, day, or month
+ * Query params:
+ *   - entitySlug: Required. The entity slug to get rate limit history for.
+ *   - testMode: Optional, set to "true" for sandbox mode.
  */
 ratelimitsRouter.get("/history/:periodType", async c => {
   try {
@@ -101,8 +164,21 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     const periodType = periodTypeParam as RateLimitPeriodType;
     const firebaseUser = c.get("firebaseUser");
 
+    // Get entity ID for rate limit lookup
+    const { entityId, error: entityError } = await getEntityIdForRateLimits(
+      c,
+      firebaseUser.uid
+    );
+
+    if (entityError || !entityId) {
+      const status = entityError === "entitySlug is required" ? 400 :
+                     entityError === "Access denied to entity" ? 403 : 404;
+      return c.json(errorResponse(entityError || "Entity not found"), status);
+    }
+
+    // Use entity ID for rate limits (subscriptions are per-entity)
     const data = await getRateLimitRouteHandler(testMode).getRateLimitHistoryData(
-      firebaseUser.uid,
+      entityId,
       periodType
     );
 

@@ -1,5 +1,4 @@
 [test]
 preload = ["./tests/setup.ts"]
 
-[test.env]
-DATABASE_URL = "postgres://localhost:5432/shapeshyft_test"
+# DATABASE_URL is set in tests/setup.ts or via environment variable in CI

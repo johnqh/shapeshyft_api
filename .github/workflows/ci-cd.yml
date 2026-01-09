@@ -25,4 +25,5 @@ jobs:
     with:
       docker-image-name: "shapeshyft_api"
       skip-npm-publish: true # This is an API server, not an NPM library
+      test-command: "bun run test:unit" # Run unit tests only (no database required)
     secrets: inherit # Pass all repository secrets

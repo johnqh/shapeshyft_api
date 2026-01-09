@@ -6,8 +6,10 @@
 // Set test mode - MUST be set before any imports
 process.env.NODE_ENV = "test";
 
-// ALWAYS use the test database - override any existing value
-process.env.DATABASE_URL = "postgres://localhost:5432/shapeshyft_test";
+// Use test database - only set if not already configured (allows CI to override)
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = "postgres://localhost:5432/shapeshyft_test";
+}
 
 if (!process.env.ENCRYPTION_KEY) {
   // Test encryption key (32 bytes = 64 hex chars)

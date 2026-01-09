@@ -1,4 +1,4 @@
-import type { JsonSchema } from "@sudobility/shapeshyft_types";
+import type { JsonSchema, LlmProvider } from "@sudobility/shapeshyft_types";
 
 /**
  * Convert JSON Schema to human-readable prompt instructions
@@ -217,6 +217,179 @@ export function buildPrompts(
 ): { system: string; user: string } {
   return {
     system: buildSystemPrompt(userDescription, outputSchema),
+    user: buildUserPrompt(inputData, isStructuredInput),
+  };
+}
+
+// =============================================================================
+// Provider-Specific Prompt Customization
+// =============================================================================
+
+/**
+ * Provider-specific prompt configuration
+ */
+export interface ProviderPromptConfig {
+  /** Base instruction for the assistant role */
+  baseInstruction: string;
+  /** How to format JSON output requirement */
+  jsonInstruction: string;
+  /** Whether to include example output */
+  includeExample: boolean;
+  /** Whether to be more verbose in schema descriptions */
+  verboseSchema: boolean;
+  /** Additional provider-specific instructions */
+  additionalInstructions?: string;
+}
+
+/**
+ * Get provider-specific prompt configuration
+ */
+export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptConfig {
+  switch (provider) {
+    case "openai":
+      return {
+        baseInstruction: "You are a helpful assistant that produces structured data output.",
+        jsonInstruction: "Respond with valid JSON only. Do not include any text outside the JSON object.",
+        includeExample: true,
+        verboseSchema: false,
+      };
+
+    case "anthropic":
+      return {
+        baseInstruction: "You are Claude, an AI assistant. Your task is to analyze the input and produce structured data output.",
+        jsonInstruction: "Output valid JSON only. Do not include markdown code blocks, explanations, or any text outside the JSON object.",
+        includeExample: true,
+        verboseSchema: true,
+        additionalInstructions: "Think step by step about the data structure before generating output.",
+      };
+
+    case "gemini":
+      return {
+        baseInstruction: "You are a helpful assistant that produces structured JSON data.",
+        jsonInstruction: "Return only valid JSON matching the specified schema.",
+        includeExample: false, // Gemini uses responseSchema natively
+        verboseSchema: false,
+      };
+
+    case "mistral":
+      return {
+        baseInstruction: "You are a helpful assistant specialized in producing structured data output.",
+        jsonInstruction: "Respond with valid JSON only. No markdown, no explanations, just the JSON object.",
+        includeExample: true,
+        verboseSchema: false,
+      };
+
+    case "cohere":
+      return {
+        baseInstruction: "You are a helpful assistant that generates structured data responses.",
+        jsonInstruction: "Output valid JSON only. Do not include any text, markdown, or explanations outside the JSON.",
+        includeExample: true,
+        verboseSchema: true,
+      };
+
+    case "groq":
+      return {
+        baseInstruction: "You are a fast, efficient assistant that produces structured data.",
+        jsonInstruction: "Respond with valid JSON only.",
+        includeExample: true,
+        verboseSchema: false,
+      };
+
+    case "xai":
+      return {
+        baseInstruction: "You are Grok, an AI assistant. Generate structured data output based on the given input.",
+        jsonInstruction: "Return valid JSON only. No additional text or formatting.",
+        includeExample: true,
+        verboseSchema: true,
+      };
+
+    case "deepseek":
+      return {
+        baseInstruction: "You are a helpful assistant that produces structured JSON output.",
+        jsonInstruction: "Respond with valid JSON only. Do not include markdown code blocks or any text outside the JSON.",
+        includeExample: true,
+        verboseSchema: true,
+        additionalInstructions: "Analyze the input carefully before generating the structured response.",
+      };
+
+    case "perplexity":
+      return {
+        baseInstruction: "You are a helpful assistant that produces structured data output based on available information.",
+        jsonInstruction: "Output valid JSON only. No citations, no explanations, just the JSON object.",
+        includeExample: true,
+        verboseSchema: false,
+        additionalInstructions: "Focus on the specific data requested, not general information.",
+      };
+
+    case "llm_server":
+    default:
+      return {
+        baseInstruction: "You are a helpful assistant that produces structured data output.",
+        jsonInstruction: "Respond with valid JSON only. Do not include any text outside the JSON object.",
+        includeExample: true,
+        verboseSchema: false,
+      };
+  }
+}
+
+/**
+ * Build system prompt optimized for a specific provider
+ */
+export function buildSystemPromptForProvider(
+  userDescription: string | null,
+  outputSchema: JsonSchema | null,
+  provider: LlmProvider
+): string {
+  const config = getProviderPromptConfig(provider);
+  const parts: string[] = [];
+
+  // Provider-specific base instruction
+  parts.push(config.baseInstruction);
+
+  // User's description
+  if (userDescription) {
+    parts.push(`\n## Task Description\n${userDescription}`);
+  }
+
+  // Schema instructions
+  if (outputSchema) {
+    const schemaInstructions = schemaToPromptInstructions(outputSchema);
+    parts.push(
+      `\n## Output Structure\nYour response must include the following fields:\n${schemaInstructions}`
+    );
+
+    // Add example if configured and schema is complex
+    if (config.includeExample && isComplexSchema(outputSchema)) {
+      const example = generateSchemaExample(outputSchema);
+      parts.push(
+        `\n## Example Output Structure\n\`\`\`json\n${JSON.stringify(example, null, 2)}\n\`\`\``
+      );
+    }
+  }
+
+  // Additional provider-specific instructions
+  if (config.additionalInstructions) {
+    parts.push(`\n## Additional Guidelines\n${config.additionalInstructions}`);
+  }
+
+  // JSON instruction
+  parts.push(`\n## Response Format\n${config.jsonInstruction}`);
+
+  return parts.join("\n");
+}
+
+/**
+ * Build complete prompts optimized for a specific provider
+ */
+export function buildPromptsForProvider(
+  inputData: unknown,
+  outputSchema: JsonSchema | null,
+  userDescription: string | null,
+  isStructuredInput: boolean,
+  provider: LlmProvider
+): { system: string; user: string } {
+  return {
+    system: buildSystemPromptForProvider(userDescription, outputSchema, provider),
     user: buildUserPrompt(inputData, isStructuredInput),
   };
 }

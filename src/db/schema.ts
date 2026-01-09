@@ -26,8 +26,14 @@ export const shapeshyftSchema = pgSchema("shapeshyft");
 
 export const llmProviderEnum = pgEnum("llm_provider", [
   "openai",
-  "gemini",
   "anthropic",
+  "gemini",
+  "mistral",
+  "cohere",
+  "groq",
+  "xai",
+  "deepseek",
+  "perplexity",
   "llm_server",
 ]);
 
@@ -35,11 +41,11 @@ export const httpMethodEnum = pgEnum("http_method", ["GET", "POST"]);
 
 // =============================================================================
 // Users Table
+// firebase_uid is the primary key - no internal UUID needed
 // =============================================================================
 
 export const users = shapeshyftSchema.table("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  firebase_uid: varchar("firebase_uid", { length: 128 }).notNull().unique(),
+  firebase_uid: varchar("firebase_uid", { length: 128 }).primaryKey(),
   email: varchar("email", { length: 255 }),
   display_name: varchar("display_name", { length: 255 }),
   created_at: timestamp("created_at").defaultNow(),
@@ -52,9 +58,9 @@ export const users = shapeshyftSchema.table("users", {
 
 export const userSettings = shapeshyftSchema.table("user_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
-  user_id: uuid("user_id")
+  firebase_uid: varchar("firebase_uid", { length: 128 })
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" })
+    .references(() => users.firebase_uid, { onDelete: "cascade" })
     .unique(),
   organization_name: varchar("organization_name", { length: 255 }),
   organization_path: varchar("organization_path", { length: 255 })

@@ -19,7 +19,7 @@ const config: InvitationHelperConfig = {
 const helpers = createEntityHelpers(config);
 
 type Variables = {
-  userId: string;
+  userId: string; // This is the firebase_uid directly
   userEmail: string | null;
 };
 
@@ -33,10 +33,14 @@ const entitiesRouter = new Hono<{ Variables: Variables }>();
  * GET /entities - List all entities for the current user
  */
 entitiesRouter.get("/", async (c) => {
-  const userId = c.get("userId");
+  const userId = c.get("userId"); // firebase_uid
+  const userEmail = c.get("userEmail");
 
   try {
-    const userEntities = await helpers.entity.getUserEntities(userId);
+    const userEntities = await helpers.entity.getUserEntities(
+      userId,
+      userEmail ?? undefined
+    );
     return c.json({ success: true, data: userEntities });
   } catch (error: any) {
     console.error("Error listing entities:", error);
@@ -48,7 +52,7 @@ entitiesRouter.get("/", async (c) => {
  * POST /entities - Create a new organization entity
  */
 entitiesRouter.post("/", async (c) => {
-  const userId = c.get("userId");
+  const userId = c.get("userId"); // firebase_uid
   const body = await c.req.json();
 
   const { displayName, entitySlug, description } = body;

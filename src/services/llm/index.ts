@@ -27,6 +27,14 @@ export function createLLMProvider(
       return new AnthropicProvider(config);
     case "gemini":
       return new GeminiProvider(config);
+    // Providers with OpenAI-compatible API format
+    case "mistral":
+    case "groq":
+    case "xai":
+    case "deepseek":
+    case "perplexity":
+    case "cohere":
+      return new OpenAIProvider(config); // Most use OpenAI-compatible format
     case "llm_server":
       return new CustomLLMProvider(config);
     default:
@@ -40,7 +48,12 @@ export function createLLMProvider(
 export const PROVIDER_ENDPOINTS: Record<LlmProvider, string> = {
   openai: "https://api.openai.com/v1/chat/completions",
   anthropic: "https://api.anthropic.com/v1/messages",
-  gemini:
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+  gemini: "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+  mistral: "https://api.mistral.ai/v1/chat/completions",
+  cohere: "https://api.cohere.ai/v1/chat",
+  groq: "https://api.groq.com/openai/v1/chat/completions",
+  xai: "https://api.x.ai/v1/chat/completions",
+  deepseek: "https://api.deepseek.com/v1/chat/completions",
+  perplexity: "https://api.perplexity.ai/chat/completions",
   llm_server: "{custom_endpoint}",
 };

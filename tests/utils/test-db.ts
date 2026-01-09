@@ -16,66 +16,57 @@ import type { MockFirebaseUser } from "./mock-auth";
  * Clean up all test data for a specific user and their entities
  */
 export async function cleanupTestUser(firebaseUid: string) {
-  const userRows = await db
-    .select()
-    .from(users)
-    .where(eq(users.firebase_uid, firebaseUid));
+  // Get all entities where user is a member
+  const userMemberships = await db
+    .select({ entity_id: entityMembers.entity_id })
+    .from(entityMembers)
+    .where(eq(entityMembers.user_id, firebaseUid));
 
-  if (userRows.length > 0) {
-    const user = userRows[0]!;
-
-    // Get all entities owned by user
-    const userEntities = await db
+  for (const membership of userMemberships) {
+    // Get all projects for entity
+    const entityProjects = await db
       .select()
-      .from(entities)
-      .where(eq(entities.owner_user_id, user.id));
+      .from(projects)
+      .where(eq(projects.entity_id, membership.entity_id));
 
-    for (const entity of userEntities) {
-      // Get all projects for entity
-      const entityProjects = await db
+    // Delete usage analytics and endpoints for each project
+    for (const project of entityProjects) {
+      const projectEndpoints = await db
         .select()
-        .from(projects)
-        .where(eq(projects.entity_id, entity.id));
+        .from(endpoints)
+        .where(eq(endpoints.project_id, project.uuid));
 
-      // Delete usage analytics and endpoints for each project
-      for (const project of entityProjects) {
-        const projectEndpoints = await db
-          .select()
-          .from(endpoints)
-          .where(eq(endpoints.project_id, project.uuid));
-
-        for (const endpoint of projectEndpoints) {
-          await db
-            .delete(usageAnalytics)
-            .where(eq(usageAnalytics.endpoint_id, endpoint.uuid));
-        }
-
-        await db.delete(endpoints).where(eq(endpoints.project_id, project.uuid));
+      for (const endpoint of projectEndpoints) {
+        await db
+          .delete(usageAnalytics)
+          .where(eq(usageAnalytics.endpoint_id, endpoint.uuid));
       }
 
-      // Delete projects
-      await db.delete(projects).where(eq(projects.entity_id, entity.id));
-
-      // Delete LLM keys
-      await db.delete(llmApiKeys).where(eq(llmApiKeys.entity_id, entity.id));
-
-      // Delete entity members
-      await db.delete(entityMembers).where(eq(entityMembers.entity_id, entity.id));
+      await db.delete(endpoints).where(eq(endpoints.project_id, project.uuid));
     }
 
-    // Delete entities
-    await db.delete(entities).where(eq(entities.owner_user_id, user.id));
+    // Delete projects
+    await db.delete(projects).where(eq(projects.entity_id, membership.entity_id));
 
-    // Delete user settings
-    await db.delete(userSettings).where(eq(userSettings.user_id, user.id));
+    // Delete LLM keys
+    await db.delete(llmApiKeys).where(eq(llmApiKeys.entity_id, membership.entity_id));
 
-    // Delete user
-    await db.delete(users).where(eq(users.id, user.id));
+    // Delete entity members
+    await db.delete(entityMembers).where(eq(entityMembers.entity_id, membership.entity_id));
+
+    // Delete entity
+    await db.delete(entities).where(eq(entities.id, membership.entity_id));
   }
+
+  // Delete user settings
+  await db.delete(userSettings).where(eq(userSettings.firebase_uid, firebaseUid));
+
+  // Delete user
+  await db.delete(users).where(eq(users.firebase_uid, firebaseUid));
 }
 
 /**
- * Get user ID by firebase UID
+ * Get user by firebase UID (firebase_uid is the primary key)
  */
 export async function getUserId(firebaseUid: string): Promise<string> {
   const rows = await db
@@ -87,7 +78,8 @@ export async function getUserId(firebaseUid: string): Promise<string> {
     throw new Error(`User not found for firebase UID: ${firebaseUid}`);
   }
 
-  return rows[0]!.id;
+  // Return firebase_uid as the user ID (it's now the primary key)
+  return rows[0]!.firebase_uid;
 }
 
 /** @deprecated Use getUserId instead */
@@ -135,9 +127,11 @@ function generateSlug(): string {
 
 /**
  * Create a test entity (personal by default)
+ * Note: Ownership is tracked via entity_members table, not entities table
+ * @param firebaseUid - The firebase_uid of the user who owns this entity
  */
 export async function createTestEntity(
-  userId: string,
+  firebaseUid: string,
   data?: {
     entity_slug?: string;
     entity_type?: "personal" | "organization";
@@ -148,23 +142,24 @@ export async function createTestEntity(
   const entityType = data?.entity_type ?? "personal";
   const displayName = data?.display_name ?? "Test Entity";
 
+  // Create entity (no owner_user_id - ownership tracked via entity_members)
   const rows = await db
     .insert(entities)
     .values({
       entity_slug: entitySlug,
       entity_type: entityType,
       display_name: displayName,
-      owner_user_id: userId,
     })
     .returning();
 
   const entity = rows[0]!;
 
-  // Add owner as admin member
+  // Add user as admin member (personal entities use 'admin', organizations use 'owner')
+  const role = entityType === "personal" ? "admin" : "owner";
   await db.insert(entityMembers).values({
     entity_id: entity.id,
-    user_id: userId,
-    role: "admin",
+    user_id: firebaseUid,
+    role: role,
   });
 
   return entity;
@@ -183,17 +178,22 @@ export async function getTestEntity(entitySlug: string) {
 }
 
 /**
- * Get user's personal entity
+ * Get user's personal entity via entity_members
  */
-export async function getPersonalEntity(userId: string) {
+export async function getPersonalEntity(firebaseUid: string) {
   const rows = await db
-    .select()
+    .select({ entity: entities })
     .from(entities)
+    .innerJoin(entityMembers, eq(entities.id, entityMembers.entity_id))
     .where(
-      and(eq(entities.owner_user_id, userId), eq(entities.entity_type, "personal"))
+      and(
+        eq(entityMembers.user_id, firebaseUid),
+        eq(entities.entity_type, "personal"),
+        eq(entityMembers.is_active, true)
+      )
     );
 
-  return rows.length > 0 ? rows[0]! : null;
+  return rows.length > 0 ? rows[0]!.entity : null;
 }
 
 /**
@@ -202,7 +202,8 @@ export async function getPersonalEntity(userId: string) {
  */
 export async function createTestUserWithEntity(mockUser: MockFirebaseUser) {
   const user = await createTestUser(mockUser);
-  const entity = await createTestEntity(user.id, {
+  // Pass firebase_uid to createTestEntity (not user.id since firebase_uid is the PK)
+  const entity = await createTestEntity(user.firebase_uid, {
     entity_type: "personal",
     display_name: mockUser.displayName ?? "Personal",
   });

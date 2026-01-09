@@ -55,12 +55,12 @@ export async function initDatabase() {
 
   // =============================================================================
   // Step 1: Create users and user_settings tables
+  // firebase_uid is now the primary key
   // =============================================================================
 
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      firebase_uid VARCHAR(128) NOT NULL UNIQUE,
+      firebase_uid VARCHAR(128) PRIMARY KEY,
       email VARCHAR(255),
       display_name VARCHAR(255),
       created_at TIMESTAMP DEFAULT NOW(),
@@ -71,7 +71,7 @@ export async function initDatabase() {
   await client`
     CREATE TABLE IF NOT EXISTS shapeshyft.user_settings (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL UNIQUE REFERENCES shapeshyft.users(id) ON DELETE CASCADE,
+      firebase_uid VARCHAR(128) NOT NULL UNIQUE REFERENCES shapeshyft.users(firebase_uid) ON DELETE CASCADE,
       organization_name VARCHAR(255),
       organization_path VARCHAR(255) NOT NULL UNIQUE,
       created_at TIMESTAMP DEFAULT NOW(),

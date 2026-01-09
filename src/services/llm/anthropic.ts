@@ -6,7 +6,7 @@ import type {
   ProviderConfig,
 } from "./types";
 
-const DEFAULT_MODEL = "claude-3-5-sonnet-20241022";
+const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 
 export class AnthropicProvider implements ILLMProvider {
   readonly providerName = "anthropic" as const;

@@ -17,7 +17,7 @@ describe("Projects Routes", () => {
     await cleanupTestUser(testUser.uid);
     // Create user with entity for each test
     const { user, entity } = await createTestUserWithEntity(testUser);
-    userId = user.id;
+    userId = user.firebase_uid;
     entitySlug = entity.entity_slug;
     // Create app with the user's ID
     app = createTestApp(testUser, userId);

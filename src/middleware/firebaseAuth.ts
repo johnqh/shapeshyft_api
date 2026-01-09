@@ -8,37 +8,30 @@ import { db, users } from "../db";
 declare module "hono" {
   interface ContextVariableMap {
     firebaseUser: DecodedIdToken;
-    userId: string;
+    userId: string; // This is now the firebase_uid directly
     userEmail: string | null;
   }
 }
 
 /**
- * Get or create user by Firebase UID
- * Returns the internal user UUID
+ * Ensure user record exists in database.
+ * Uses firebase_uid as the primary key.
  */
-async function getOrCreateUser(
+async function ensureUserExists(
   firebaseUid: string,
   email?: string | null
-): Promise<string> {
+): Promise<void> {
   const existing = await db
     .select()
     .from(users)
     .where(eq(users.firebase_uid, firebaseUid));
 
-  if (existing.length > 0) {
-    return existing[0]!.id;
-  }
-
-  const created = await db
-    .insert(users)
-    .values({
+  if (existing.length === 0) {
+    await db.insert(users).values({
       firebase_uid: firebaseUid,
       email: email ?? null,
-    })
-    .returning();
-
-  return created[0]!.id;
+    });
+  }
 }
 
 export async function firebaseAuthMiddleware(c: Context, next: Next) {
@@ -67,11 +60,15 @@ export async function firebaseAuthMiddleware(c: Context, next: Next) {
       );
     }
 
-    // Get or create the internal user and get their UUID
-    const userId = await getOrCreateUser(decodedToken.uid, decodedToken.email);
+    // Ensure user exists in database (for profile data)
+    // Run in background - don't block the request
+    ensureUserExists(decodedToken.uid, decodedToken.email).catch((err) =>
+      console.error("Failed to ensure user exists:", err)
+    );
 
+    // userId is now the firebase_uid directly
     c.set("firebaseUser", decodedToken);
-    c.set("userId", userId);
+    c.set("userId", decodedToken.uid);
     c.set("userEmail", decodedToken.email ?? null);
     await next();
   } catch {

@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.30",
+  "version": "1.0.31",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -30,6 +30,9 @@
     "eslint-plugin-import": "^2.32.0",
     "prettier": "^3.7.4",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "esbuild": "0.25.12"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

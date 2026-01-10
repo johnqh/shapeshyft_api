@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect } from "vitest";
 import type { JsonSchema, LlmProvider } from "@sudobility/shapeshyft_types";
 import {
   schemaToPromptInstructions,

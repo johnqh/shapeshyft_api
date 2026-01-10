@@ -89,6 +89,7 @@ export async function initDatabase() {
     schemaName: "shapeshyft",
     indexPrefix: "shapeshyft",
     migrateProjects: false, // Tables are created fresh with entity_id
+    migrateUsers: false, // Personal entities created on-demand via EntityHelper
   });
 
   // =============================================================================

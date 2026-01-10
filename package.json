@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.32",
+  "version": "1.0.33",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -38,7 +38,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@google/generative-ai": "^0.21.0",
     "@hono/zod-validator": "^0.7.5",
-    "@sudobility/entity_service": "^1.0.8",
+    "@sudobility/entity_service": "^1.0.9",
     "@sudobility/ratelimit_service": "^1.0.12",
     "@sudobility/shapeshyft_types": "^1.0.19",
     "@sudobility/types": "^1.9.43",

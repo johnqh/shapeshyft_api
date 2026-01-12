@@ -317,6 +317,35 @@ entitiesRouter.post("/:entitySlug/invitations", async (c) => {
 });
 
 /**
+ * PUT /entities/:entitySlug/invitations/:invitationId - Renew invitation
+ * Renews the invitation with a new 14-day expiration and optionally resends email
+ */
+entitiesRouter.put("/:entitySlug/invitations/:invitationId", async (c) => {
+  const userId = c.get("userId");
+  const entitySlug = c.req.param("entitySlug");
+  const invitationId = c.req.param("invitationId");
+
+  try {
+    const entity = await helpers.entity.getEntityBySlug(entitySlug);
+    if (!entity) {
+      return c.json({ success: false, error: "Entity not found" }, 404);
+    }
+
+    // Check if user can manage members (admin only)
+    const canManage = await helpers.permissions.canManageMembers(entity.id, userId);
+    if (!canManage) {
+      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+    }
+
+    const renewed = await helpers.invitations.renewInvitation(invitationId);
+    return c.json({ success: true, data: renewed });
+  } catch (error: any) {
+    console.error("Error renewing invitation:", error);
+    return c.json({ success: false, error: error.message }, 400);
+  }
+});
+
+/**
  * DELETE /entities/:entitySlug/invitations/:invitationId - Cancel invitation
  */
 entitiesRouter.delete("/:entitySlug/invitations/:invitationId", async (c) => {

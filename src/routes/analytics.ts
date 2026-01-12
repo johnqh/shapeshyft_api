@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
-import { db, projects, endpoints, usageAnalytics, entityMembers } from "../db";
+import { db, projects, endpoints, usageAnalytics, entities, entityMembers } from "../db";
 import { analyticsQuerySchema } from "../schemas";
 import {
   successResponse,
+  errorResponse,
   type UsageAggregate,
   type UsageByEndpoint,
   type AnalyticsResponse,
@@ -13,58 +14,75 @@ import {
 const analyticsRouter = new Hono();
 
 /**
- * Helper to get all entity IDs the user is a member of
+ * Verify user has access to entity and return its ID.
  */
-async function getUserEntityIds(userId: string): Promise<string[]> {
-  const memberships = await db
-    .select({ entityId: entityMembers.entity_id })
-    .from(entityMembers)
-    .where(eq(entityMembers.user_id, userId));
+async function getEntityIdForAnalytics(
+  c: any,
+  firebaseUid: string
+): Promise<{ entityId: string | null; error: string | null }> {
+  const entitySlug = c.req.param("entitySlug");
 
-  return memberships.map(m => m.entityId);
+  if (!entitySlug) {
+    return { entityId: null, error: "entitySlug is required" };
+  }
+
+  // Look up entity by slug
+  const entityRows = await db
+    .select()
+    .from(entities)
+    .where(eq(entities.entity_slug, entitySlug));
+
+  if (entityRows.length === 0) {
+    return { entityId: null, error: "Entity not found" };
+  }
+
+  const entity = entityRows[0]!;
+
+  // Verify user has access to this entity
+  const memberRows = await db
+    .select()
+    .from(entityMembers)
+    .where(eq(entityMembers.entity_id, entity.id));
+
+  const isMember = memberRows.some((m) => m.user_id === firebaseUid);
+  if (!isMember) {
+    return { entityId: null, error: "Access denied to entity" };
+  }
+
+  return { entityId: entity.id, error: null };
 }
 
-// GET analytics for user (across all their entities)
+/**
+ * GET /entities/:entitySlug/analytics
+ * Returns analytics for a specific entity
+ */
 analyticsRouter.get(
   "/",
   zValidator("query", analyticsQuerySchema),
   async c => {
-    const userId = c.get("userId"); // Internal DB UUID
     const firebaseUser = c.get("firebaseUser");
-    const requestedUserId = c.req.param("userId"); // Firebase UID from URL
 
-    // Users can only view their own analytics (compare Firebase UIDs)
-    if (requestedUserId !== firebaseUser.uid) {
-      return c.json({ success: false, error: "Access denied" }, 403);
+    // Get entity ID from path parameter
+    const { entityId, error: entityError } = await getEntityIdForAnalytics(
+      c,
+      firebaseUser.uid
+    );
+
+    if (entityError || !entityId) {
+      const status = entityError === "entitySlug is required" ? 400 :
+                     entityError === "Access denied to entity" ? 403 : 404;
+      return c.json(errorResponse(entityError || "Entity not found"), status);
     }
+
     const query = c.req.valid("query");
 
-    // Get all entities the user is a member of
-    const entityIds = await getUserEntityIds(userId);
-
-    if (entityIds.length === 0) {
-      const emptyResponse: AnalyticsResponse = {
-        aggregate: {
-          total_requests: 0,
-          successful_requests: 0,
-          failed_requests: 0,
-          total_tokens_input: 0,
-          total_tokens_output: 0,
-          total_estimated_cost_cents: 0,
-          average_latency_ms: 0,
-        },
-        by_endpoint: [],
-      };
-      return c.json(successResponse(emptyResponse));
-    }
-
-    // Get all projects across user's entities
-    const userProjects = await db
+    // Get all projects for this entity
+    const entityProjects = await db
       .select()
       .from(projects)
-      .where(inArray(projects.entity_id, entityIds));
+      .where(eq(projects.entity_id, entityId));
 
-    if (userProjects.length === 0) {
+    if (entityProjects.length === 0) {
       const emptyResponse: AnalyticsResponse = {
         aggregate: {
           total_requests: 0,
@@ -80,15 +98,15 @@ analyticsRouter.get(
       return c.json(successResponse(emptyResponse));
     }
 
-    const projectIds = userProjects.map(p => p.uuid);
+    const projectIds = entityProjects.map(p => p.uuid);
 
-    // Get all endpoints for user's projects
-    const userEndpoints = await db
+    // Get all endpoints for entity's projects
+    const entityEndpoints = await db
       .select()
       .from(endpoints)
       .where(sql`${endpoints.project_id} IN ${projectIds}`);
 
-    if (userEndpoints.length === 0) {
+    if (entityEndpoints.length === 0) {
       const emptyResponse: AnalyticsResponse = {
         aggregate: {
           total_requests: 0,
@@ -104,9 +122,9 @@ analyticsRouter.get(
       return c.json(successResponse(emptyResponse));
     }
 
-    const endpointIds = userEndpoints.map(e => e.uuid);
+    const endpointIds = entityEndpoints.map(e => e.uuid);
     const endpointNameMap = new Map(
-      userEndpoints.map(e => [e.uuid, e.endpoint_name])
+      entityEndpoints.map(e => [e.uuid, e.endpoint_name])
     );
 
     // Build conditions for analytics query
@@ -127,7 +145,7 @@ analyticsRouter.get(
     }
     if (query.project_id) {
       // Filter endpoints by project
-      const projectEndpoints = userEndpoints
+      const projectEndpoints = entityEndpoints
         .filter(e => e.project_id === query.project_id)
         .map(e => e.uuid);
       if (projectEndpoints.length === 0) {

@@ -25,9 +25,9 @@ adminRoutes.route(
   "/entities/:entitySlug/projects/:projectId/endpoints",
   endpointsRouter
 );
-adminRoutes.route("/users/:userId/analytics", analyticsRouter);
+adminRoutes.route("/entities/:entitySlug/analytics", analyticsRouter);
+adminRoutes.route("/ratelimits/:rateLimitUserId", ratelimitsRouter);
 adminRoutes.route("/users/:userId/settings", settingsRouter);
-adminRoutes.route("/ratelimits", ratelimitsRouter);
 adminRoutes.route("/entities", entitiesRouter);
 adminRoutes.route("/invitations", invitationsRouter);
 routes.route("/", adminRoutes);

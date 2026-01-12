@@ -36,24 +36,24 @@ function isRevenueCatConfigured(testMode: boolean = false): boolean {
 
 /**
  * Verify user has access to entity and return its ID.
- * entitySlug is required - passed from the app based on current dashboard context.
+ * rateLimitUserId is taken from path parameter (in shapeshyft, this is an entity slug).
  */
 async function getEntityIdForRateLimits(
   c: any,
   firebaseUid: string
 ): Promise<{ entityId: string | null; error: string | null }> {
-  const url = new URL(c.req.url);
-  const entitySlug = url.searchParams.get("entitySlug");
+  // In shapeshyft, rateLimitUserId is the entity slug
+  const rateLimitUserId = c.req.param("rateLimitUserId");
 
-  if (!entitySlug) {
-    return { entityId: null, error: "entitySlug is required" };
+  if (!rateLimitUserId) {
+    return { entityId: null, error: "rateLimitUserId is required" };
   }
 
-  // Look up entity by slug
+  // Look up entity by slug (rateLimitUserId is entity slug in shapeshyft)
   const entityRows = await db
     .select()
     .from(entities)
-    .where(eq(entities.entity_slug, entitySlug));
+    .where(eq(entities.entity_slug, rateLimitUserId));
 
   if (entityRows.length === 0) {
     return { entityId: null, error: "Entity not found" };
@@ -76,11 +76,11 @@ async function getEntityIdForRateLimits(
 }
 
 /**
- * GET /ratelimits
+ * GET /ratelimits/:rateLimitUserId
  * Returns rate limit configurations for all entitlement tiers
  * and the current entity's usage.
+ * In shapeshyft, rateLimitUserId is the entity slug.
  * Query params:
- *   - entitySlug: Required. The entity slug to get rate limits for.
  *   - testMode: Optional, set to "true" for sandbox mode.
  * Note: Firebase auth is applied at the admin routes level.
  */
@@ -112,7 +112,7 @@ ratelimitsRouter.get("/", async c => {
     );
 
     if (entityError || !entityId) {
-      const status = entityError === "entitySlug is required" ? 400 :
+      const status = entityError === "rateLimitUserId is required" ? 400 :
                      entityError === "Access denied to entity" ? 403 : 404;
       return c.json(errorResponse(entityError || "Entity not found"), status);
     }
@@ -130,11 +130,11 @@ ratelimitsRouter.get("/", async c => {
 });
 
 /**
- * GET /ratelimits/history/:periodType
+ * GET /ratelimits/:rateLimitUserId/history/:periodType
  * Returns usage history for a specific period type.
+ * In shapeshyft, rateLimitUserId is the entity slug.
  * periodType can be: hour, day, or month
  * Query params:
- *   - entitySlug: Required. The entity slug to get rate limit history for.
  *   - testMode: Optional, set to "true" for sandbox mode.
  */
 ratelimitsRouter.get("/history/:periodType", async c => {
@@ -171,7 +171,7 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     );
 
     if (entityError || !entityId) {
-      const status = entityError === "entitySlug is required" ? 400 :
+      const status = entityError === "rateLimitUserId is required" ? 400 :
                      entityError === "Access denied to entity" ? 403 : 404;
       return c.json(errorResponse(entityError || "Entity not found"), status);
     }

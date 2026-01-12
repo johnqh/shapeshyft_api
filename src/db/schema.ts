@@ -9,6 +9,7 @@ import {
   integer,
   jsonb,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 import { createRateLimitCountersTable } from "@sudobility/ratelimit_service";
 import {
@@ -132,6 +133,7 @@ export const projects = shapeshyftSchema.table(
       table.entity_id,
       table.project_name
     ),
+    entityIdx: index("shapeshyft_projects_entity_idx").on(table.entity_id),
   })
 );
 
@@ -167,6 +169,7 @@ export const endpoints = shapeshyftSchema.table(
       table.project_id,
       table.endpoint_name
     ),
+    projectIdx: index("shapeshyft_endpoints_project_idx").on(table.project_id),
   })
 );
 

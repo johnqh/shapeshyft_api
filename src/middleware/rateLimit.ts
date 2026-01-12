@@ -31,7 +31,7 @@ let _rateLimitMiddleware: ReturnType<typeof createRateLimitMiddleware> | null =
 let _rateLimitMiddlewareSandbox: ReturnType<typeof createRateLimitMiddleware> | null =
   null;
 
-const entitlementDisplayNames = {
+export const entitlementDisplayNames: Record<string, string> = {
   none: "Free",
   bandwidth_dev: "Developer",
   bandwidth_pro: "Pro",

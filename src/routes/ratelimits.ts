@@ -9,7 +9,7 @@ import {
   type RateLimitsConfigResponse,
   type RateLimitHistoryResponse,
 } from "@sudobility/types";
-import { getRateLimitRouteHandler, rateLimitsConfig } from "../middleware/rateLimit";
+import { getRateLimitRouteHandler, rateLimitsConfig, entitlementDisplayNames } from "../middleware/rateLimit";
 import { getEnv } from "../lib/env-helper";
 import { db, entities, entityMembers } from "../db";
 
@@ -91,14 +91,28 @@ ratelimitsRouter.get("/", async c => {
     // If RevenueCat is not configured, return static config without usage data
     if (!isRevenueCatConfigured(testMode)) {
       const noneLimits = rateLimitsConfig.none;
+      // Convert flat config to tiers array format
+      const tiers = Object.entries(rateLimitsConfig).map(([entitlement, limits]) => ({
+        entitlement,
+        displayName: entitlementDisplayNames[entitlement] || entitlement,
+        limits: {
+          hourly: limits.hourly ?? null,
+          daily: limits.daily ?? null,
+          monthly: limits.monthly ?? null,
+        },
+      }));
       return c.json(successResponse({
-        tiers: rateLimitsConfig,
+        tiers,
         currentEntitlement: "none",
-        currentLimits: noneLimits,
+        currentLimits: {
+          hourly: noneLimits.hourly ?? null,
+          daily: noneLimits.daily ?? null,
+          monthly: noneLimits.monthly ?? null,
+        },
         currentUsage: {
-          hourly: { used: 0, limit: noneLimits.hourly ?? 0, remaining: noneLimits.hourly ?? 0 },
-          daily: { used: 0, limit: noneLimits.daily ?? 0, remaining: noneLimits.daily ?? 0 },
-          monthly: { used: 0, limit: noneLimits.monthly ?? 0, remaining: noneLimits.monthly ?? 0 },
+          hourly: 0,
+          daily: 0,
+          monthly: 0,
         },
       }));
     }

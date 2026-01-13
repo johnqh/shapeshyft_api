@@ -2,13 +2,14 @@ import type { JsonSchema, LlmProvider } from "@sudobility/shapeshyft_types";
 
 // Re-export cost estimation functions from types package
 export {
-  COST_PER_MILLION_TOKENS,
   estimateCost,
-  getModelPricing,
   formatCost,
   formatCostPerMillion,
 } from "@sudobility/shapeshyft_types";
 export type { ModelPricing } from "@sudobility/shapeshyft_types";
+
+// Re-export getModelPricing from local providers config (data is now server-side)
+export { getModelPricing } from "../../config/providers";
 
 /**
  * Request to an LLM provider

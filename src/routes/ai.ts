@@ -22,6 +22,7 @@ import { ApiHelper } from "../lib/api-helper";
 import {
   createLLMProvider,
   estimateCost,
+  getModelPricing,
   type LLMRequest,
 } from "../services/llm";
 import {
@@ -514,8 +515,9 @@ async function handleAIRequest(c: any) {
     const llmResponse = await provider.generate(llmRequest);
 
     // 5. Calculate cost
+    const pricing = getModelPricing(llmResponse.model);
     const costCents = estimateCost(
-      llmResponse.model,
+      pricing,
       llmResponse.usage.promptTokens,
       llmResponse.usage.completionTokens
     );

@@ -11,7 +11,7 @@ export type {
   LLMResponse,
   ProviderConfig,
 } from "./types";
-export { estimateCost } from "./types";
+export { estimateCost, getModelPricing } from "./types";
 
 /**
  * Create an LLM provider instance based on provider type

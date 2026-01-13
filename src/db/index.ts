@@ -39,9 +39,40 @@ export async function initDatabase() {
   // Create enums (if they don't exist)
   await client`
     DO $$ BEGIN
-      CREATE TYPE shapeshyft.llm_provider AS ENUM ('openai', 'gemini', 'anthropic', 'llm_server');
+      CREATE TYPE shapeshyft.llm_provider AS ENUM ('openai', 'anthropic', 'gemini', 'mistral', 'cohere', 'groq', 'xai', 'deepseek', 'perplexity', 'llm_server');
     EXCEPTION
       WHEN duplicate_object THEN null;
+    END $$;
+  `;
+
+  // Add new enum values if they don't exist (migration for existing databases)
+  await client`
+    DO $$
+    BEGIN
+      -- Add mistral if not exists
+      IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'mistral' AND enumtypid = 'shapeshyft.llm_provider'::regtype) THEN
+        ALTER TYPE shapeshyft.llm_provider ADD VALUE 'mistral';
+      END IF;
+      -- Add cohere if not exists
+      IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'cohere' AND enumtypid = 'shapeshyft.llm_provider'::regtype) THEN
+        ALTER TYPE shapeshyft.llm_provider ADD VALUE 'cohere';
+      END IF;
+      -- Add groq if not exists
+      IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'groq' AND enumtypid = 'shapeshyft.llm_provider'::regtype) THEN
+        ALTER TYPE shapeshyft.llm_provider ADD VALUE 'groq';
+      END IF;
+      -- Add xai if not exists
+      IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'xai' AND enumtypid = 'shapeshyft.llm_provider'::regtype) THEN
+        ALTER TYPE shapeshyft.llm_provider ADD VALUE 'xai';
+      END IF;
+      -- Add deepseek if not exists
+      IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'deepseek' AND enumtypid = 'shapeshyft.llm_provider'::regtype) THEN
+        ALTER TYPE shapeshyft.llm_provider ADD VALUE 'deepseek';
+      END IF;
+      -- Add perplexity if not exists
+      IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'perplexity' AND enumtypid = 'shapeshyft.llm_provider'::regtype) THEN
+        ALTER TYPE shapeshyft.llm_provider ADD VALUE 'perplexity';
+      END IF;
     END $$;
   `;
 
@@ -138,6 +169,12 @@ export async function initDatabase() {
     ON shapeshyft.projects(entity_id, project_name)
   `;
 
+  // Create index for entity_id lookups
+  await client`
+    CREATE INDEX IF NOT EXISTS shapeshyft_projects_entity_idx
+    ON shapeshyft.projects(entity_id)
+  `;
+
   // =============================================================================
   // Step 5: Create endpoints table (references projects.uuid and llm_api_keys.uuid)
   // =============================================================================
@@ -150,6 +187,7 @@ export async function initDatabase() {
       display_name VARCHAR(255) NOT NULL,
       http_method shapeshyft.http_method NOT NULL DEFAULT 'POST',
       llm_key_id UUID NOT NULL REFERENCES shapeshyft.llm_api_keys(uuid) ON DELETE RESTRICT,
+      model VARCHAR(255),
       input_schema JSONB,
       output_schema JSONB,
       instructions TEXT,
@@ -160,6 +198,27 @@ export async function initDatabase() {
       updated_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(project_id, endpoint_name)
     )
+  `;
+
+  // Add model column if it doesn't exist (migration for existing tables)
+  await client`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'shapeshyft'
+        AND table_name = 'endpoints'
+        AND column_name = 'model'
+      ) THEN
+        ALTER TABLE shapeshyft.endpoints ADD COLUMN model VARCHAR(255);
+      END IF;
+    END $$;
+  `;
+
+  // Create index for project_id lookups
+  await client`
+    CREATE INDEX IF NOT EXISTS shapeshyft_endpoints_project_idx
+    ON shapeshyft.endpoints(project_id)
   `;
 
   // =============================================================================

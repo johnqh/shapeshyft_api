@@ -62,20 +62,25 @@ projectsRouter.get(
   "/",
   zValidator("param", entitySlugParamSchema),
   async c => {
-    const userId = c.get("userId");
-    const { entitySlug } = c.req.valid("param");
+    try {
+      const userId = c.get("userId");
+      const { entitySlug } = c.req.valid("param");
 
-    const result = await getEntityWithPermission(entitySlug, userId);
-    if (result.error) {
-      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      const result = await getEntityWithPermission(entitySlug, userId);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
+
+      const rows = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.entity_id, result.entity.id));
+
+      return c.json(successResponse(rows));
+    } catch (error: any) {
+      console.error("Error getting projects:", error);
+      return c.json(errorResponse(error.message || "Internal server error"), 500);
     }
-
-    const rows = await db
-      .select()
-      .from(projects)
-      .where(eq(projects.entity_id, result.entity.id));
-
-    return c.json(successResponse(rows));
   }
 );
 
@@ -84,26 +89,31 @@ projectsRouter.get(
   "/:projectId",
   zValidator("param", projectIdParamSchema),
   async c => {
-    const userId = c.get("userId");
-    const { entitySlug, projectId } = c.req.valid("param");
+    try {
+      const userId = c.get("userId");
+      const { entitySlug, projectId } = c.req.valid("param");
 
-    const result = await getEntityWithPermission(entitySlug, userId);
-    if (result.error) {
-      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      const result = await getEntityWithPermission(entitySlug, userId);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
+
+      const rows = await db
+        .select()
+        .from(projects)
+        .where(
+          and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+        );
+
+      if (rows.length === 0) {
+        return c.json(errorResponse("Project not found"), 404);
+      }
+
+      return c.json(successResponse(rows[0]));
+    } catch (error: any) {
+      console.error("Error getting project:", error);
+      return c.json(errorResponse(error.message || "Internal server error"), 500);
     }
-
-    const rows = await db
-      .select()
-      .from(projects)
-      .where(
-        and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
-      );
-
-    if (rows.length === 0) {
-      return c.json(errorResponse("Project not found"), 404);
-    }
-
-    return c.json(successResponse(rows[0]));
   }
 );
 
@@ -113,84 +123,18 @@ projectsRouter.post(
   zValidator("param", entitySlugParamSchema),
   zValidator("json", projectCreateSchema),
   async c => {
-    const userId = c.get("userId");
-    const { entitySlug } = c.req.valid("param");
-    const body = c.req.valid("json");
+    try {
+      const userId = c.get("userId");
+      const { entitySlug } = c.req.valid("param");
+      const body = c.req.valid("json");
 
-    const result = await getEntityWithPermission(entitySlug, userId, true);
-    if (result.error) {
-      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
-    }
+      const result = await getEntityWithPermission(entitySlug, userId, true);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
 
-    // Check for duplicate project name
-    const existing = await db
-      .select()
-      .from(projects)
-      .where(
-        and(
-          eq(projects.entity_id, result.entity.id),
-          eq(projects.project_name, body.project_name)
-        )
-      );
-
-    if (existing.length > 0) {
-      return c.json(errorResponse("Project name already exists"), 409);
-    }
-
-    // Generate API key for the project
-    const { key, prefix } = generateProjectApiKey();
-    const { encrypted, iv } = encryptProjectApiKey(key);
-
-    const rows = await db
-      .insert(projects)
-      .values({
-        entity_id: result.entity.id,
-        project_name: body.project_name,
-        display_name: body.display_name,
-        description: body.description ?? null,
-        encrypted_api_key: encrypted,
-        api_key_iv: iv,
-        api_key_prefix: prefix,
-        api_key_created_at: new Date(),
-      })
-      .returning();
-
-    return c.json(successResponse(rows[0]), 201);
-  }
-);
-
-// PUT update project
-projectsRouter.put(
-  "/:projectId",
-  zValidator("param", projectIdParamSchema),
-  zValidator("json", projectUpdateSchema),
-  async c => {
-    const userId = c.get("userId");
-    const { entitySlug, projectId } = c.req.valid("param");
-    const body = c.req.valid("json");
-
-    const result = await getEntityWithPermission(entitySlug, userId, true);
-    if (result.error) {
-      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
-    }
-
-    // Check if project exists
-    const existing = await db
-      .select()
-      .from(projects)
-      .where(
-        and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
-      );
-
-    if (existing.length === 0) {
-      return c.json(errorResponse("Project not found"), 404);
-    }
-
-    const current = existing[0]!;
-
-    // Check for duplicate project name if changing
-    if (body.project_name && body.project_name !== current.project_name) {
-      const duplicate = await db
+      // Check for duplicate project name
+      const existing = await db
         .select()
         .from(projects)
         .where(
@@ -200,24 +144,100 @@ projectsRouter.put(
           )
         );
 
-      if (duplicate.length > 0) {
+      if (existing.length > 0) {
         return c.json(errorResponse("Project name already exists"), 409);
       }
+
+      // Generate API key for the project
+      const { key, prefix } = generateProjectApiKey();
+      const { encrypted, iv } = encryptProjectApiKey(key);
+
+      const rows = await db
+        .insert(projects)
+        .values({
+          entity_id: result.entity.id,
+          project_name: body.project_name,
+          display_name: body.display_name,
+          description: body.description ?? null,
+          encrypted_api_key: encrypted,
+          api_key_iv: iv,
+          api_key_prefix: prefix,
+          api_key_created_at: new Date(),
+        })
+        .returning();
+
+      return c.json(successResponse(rows[0]), 201);
+    } catch (error: any) {
+      console.error("Error creating project:", error);
+      return c.json(errorResponse(error.message || "Internal server error"), 500);
     }
+  }
+);
 
-    const rows = await db
-      .update(projects)
-      .set({
-        project_name: body.project_name ?? current.project_name,
-        display_name: body.display_name ?? current.display_name,
-        description: body.description ?? current.description,
-        is_active: body.is_active ?? current.is_active,
-        updated_at: new Date(),
-      })
-      .where(eq(projects.uuid, projectId))
-      .returning();
+// PUT update project
+projectsRouter.put(
+  "/:projectId",
+  zValidator("param", projectIdParamSchema),
+  zValidator("json", projectUpdateSchema),
+  async c => {
+    try {
+      const userId = c.get("userId");
+      const { entitySlug, projectId } = c.req.valid("param");
+      const body = c.req.valid("json");
 
-    return c.json(successResponse(rows[0]));
+      const result = await getEntityWithPermission(entitySlug, userId, true);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
+
+      // Check if project exists
+      const existing = await db
+        .select()
+        .from(projects)
+        .where(
+          and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+        );
+
+      if (existing.length === 0) {
+        return c.json(errorResponse("Project not found"), 404);
+      }
+
+      const current = existing[0]!;
+
+      // Check for duplicate project name if changing
+      if (body.project_name && body.project_name !== current.project_name) {
+        const duplicate = await db
+          .select()
+          .from(projects)
+          .where(
+            and(
+              eq(projects.entity_id, result.entity.id),
+              eq(projects.project_name, body.project_name)
+            )
+          );
+
+        if (duplicate.length > 0) {
+          return c.json(errorResponse("Project name already exists"), 409);
+        }
+      }
+
+      const rows = await db
+        .update(projects)
+        .set({
+          project_name: body.project_name ?? current.project_name,
+          display_name: body.display_name ?? current.display_name,
+          description: body.description ?? current.description,
+          is_active: body.is_active ?? current.is_active,
+          updated_at: new Date(),
+        })
+        .where(eq(projects.uuid, projectId))
+        .returning();
+
+      return c.json(successResponse(rows[0]));
+    } catch (error: any) {
+      console.error("Error updating project:", error);
+      return c.json(errorResponse(error.message || "Internal server error"), 500);
+    }
   }
 );
 
@@ -226,24 +246,29 @@ projectsRouter.delete(
   "/:projectId",
   zValidator("param", projectIdParamSchema),
   async c => {
-    const userId = c.get("userId");
-    const { entitySlug, projectId } = c.req.valid("param");
+    try {
+      const userId = c.get("userId");
+      const { entitySlug, projectId } = c.req.valid("param");
 
-    const result = await getEntityWithPermission(entitySlug, userId, true);
-    if (result.error) {
-      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      const result = await getEntityWithPermission(entitySlug, userId, true);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
+
+      const rows = await db
+        .delete(projects)
+        .where(and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId)))
+        .returning();
+
+      if (rows.length === 0) {
+        return c.json(errorResponse("Project not found"), 404);
+      }
+
+      return c.json(successResponse(rows[0]));
+    } catch (error: any) {
+      console.error("Error deleting project:", error);
+      return c.json(errorResponse(error.message || "Internal server error"), 500);
     }
-
-    const rows = await db
-      .delete(projects)
-      .where(and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId)))
-      .returning();
-
-    if (rows.length === 0) {
-      return c.json(errorResponse("Project not found"), 404);
-    }
-
-    return c.json(successResponse(rows[0]));
   }
 );
 
@@ -252,41 +277,46 @@ projectsRouter.get(
   "/:projectId/api-key",
   zValidator("param", projectIdParamSchema),
   async c => {
-    const userId = c.get("userId");
-    const { entitySlug, projectId } = c.req.valid("param");
+    try {
+      const userId = c.get("userId");
+      const { entitySlug, projectId } = c.req.valid("param");
 
-    const result = await getEntityWithPermission(entitySlug, userId);
-    if (result.error) {
-      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
-    }
+      const result = await getEntityWithPermission(entitySlug, userId);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
 
-    const rows = await db
-      .select()
-      .from(projects)
-      .where(
-        and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+      const rows = await db
+        .select()
+        .from(projects)
+        .where(
+          and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+        );
+
+      if (rows.length === 0) {
+        return c.json(errorResponse("Project not found"), 404);
+      }
+
+      const project = rows[0]!;
+
+      if (!project.encrypted_api_key || !project.api_key_iv) {
+        return c.json(errorResponse("API key not found for this project"), 404);
+      }
+
+      const apiKey = decryptProjectApiKey(
+        project.encrypted_api_key,
+        project.api_key_iv
       );
 
-    if (rows.length === 0) {
-      return c.json(errorResponse("Project not found"), 404);
+      return c.json(
+        successResponse({
+          api_key: apiKey,
+        })
+      );
+    } catch (error: any) {
+      console.error("Error getting project API key:", error);
+      return c.json(errorResponse(error.message || "Internal server error"), 500);
     }
-
-    const project = rows[0]!;
-
-    if (!project.encrypted_api_key || !project.api_key_iv) {
-      return c.json(errorResponse("API key not found for this project"), 404);
-    }
-
-    const apiKey = decryptProjectApiKey(
-      project.encrypted_api_key,
-      project.api_key_iv
-    );
-
-    return c.json(
-      successResponse({
-        api_key: apiKey,
-      })
-    );
   }
 );
 
@@ -295,49 +325,54 @@ projectsRouter.post(
   "/:projectId/api-key/refresh",
   zValidator("param", projectIdParamSchema),
   async c => {
-    const userId = c.get("userId");
-    const { entitySlug, projectId } = c.req.valid("param");
+    try {
+      const userId = c.get("userId");
+      const { entitySlug, projectId } = c.req.valid("param");
 
-    const result = await getEntityWithPermission(entitySlug, userId, true);
-    if (result.error) {
-      return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
-    }
+      const result = await getEntityWithPermission(entitySlug, userId, true);
+      if (result.error) {
+        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+      }
 
-    // Check if project exists
-    const existing = await db
-      .select()
-      .from(projects)
-      .where(
-        and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+      // Check if project exists
+      const existing = await db
+        .select()
+        .from(projects)
+        .where(
+          and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+        );
+
+      if (existing.length === 0) {
+        return c.json(errorResponse("Project not found"), 404);
+      }
+
+      // Generate new API key
+      const { key, prefix } = generateProjectApiKey();
+      const { encrypted, iv } = encryptProjectApiKey(key);
+      const createdAt = new Date();
+
+      await db
+        .update(projects)
+        .set({
+          encrypted_api_key: encrypted,
+          api_key_iv: iv,
+          api_key_prefix: prefix,
+          api_key_created_at: createdAt,
+          updated_at: createdAt,
+        })
+        .where(eq(projects.uuid, projectId));
+
+      return c.json(
+        successResponse({
+          api_key: key,
+          api_key_prefix: prefix,
+          api_key_created_at: createdAt.toISOString(),
+        })
       );
-
-    if (existing.length === 0) {
-      return c.json(errorResponse("Project not found"), 404);
+    } catch (error: any) {
+      console.error("Error refreshing project API key:", error);
+      return c.json(errorResponse(error.message || "Internal server error"), 500);
     }
-
-    // Generate new API key
-    const { key, prefix } = generateProjectApiKey();
-    const { encrypted, iv } = encryptProjectApiKey(key);
-    const createdAt = new Date();
-
-    await db
-      .update(projects)
-      .set({
-        encrypted_api_key: encrypted,
-        api_key_iv: iv,
-        api_key_prefix: prefix,
-        api_key_created_at: createdAt,
-        updated_at: createdAt,
-      })
-      .where(eq(projects.uuid, projectId));
-
-    return c.json(
-      successResponse({
-        api_key: key,
-        api_key_prefix: prefix,
-        api_key_created_at: createdAt.toISOString(),
-      })
-    );
   }
 );
 

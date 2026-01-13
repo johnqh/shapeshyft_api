@@ -9,12 +9,14 @@ import aiRouter from "./ai";
 import ratelimitsRouter from "./ratelimits";
 import entitiesRouter from "./entities";
 import invitationsRouter from "./invitations";
+import providersRouter from "./providers";
 
 const routes = new Hono();
 
-// Consumer routes (public, no auth) - MUST be registered before admin routes
+// Public routes (no auth required) - MUST be registered before admin routes
 // to avoid wildcard middleware interception
 routes.route("/ai", aiRouter);
+routes.route("/providers", providersRouter);
 
 // Admin routes (Firebase auth required)
 const adminRoutes = new Hono();
@@ -45,4 +47,5 @@ export {
   ratelimitsRouter,
   entitiesRouter,
   invitationsRouter,
+  providersRouter,
 };

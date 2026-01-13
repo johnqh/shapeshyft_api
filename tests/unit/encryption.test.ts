@@ -96,7 +96,8 @@ describe("Encryption", () => {
 
     it("should throw on tampered encrypted data", () => {
       const { encrypted, iv } = encryptApiKey("test");
-      const tampered = "00" + encrypted.slice(2);
+      // Tamper with the last byte to corrupt PKCS7 padding
+      const tampered = encrypted.slice(0, -2) + "ff";
 
       expect(() => decryptApiKey(tampered, iv)).toThrow();
     });

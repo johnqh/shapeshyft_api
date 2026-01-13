@@ -45,7 +45,7 @@ export function createTestApp(mockUser: MockFirebaseUser = testUser, testUserId?
   adminRoutes.route("/entities/:entitySlug/projects", projectsRouter);
   adminRoutes.route("/entities/:entitySlug/projects/:projectId/endpoints", endpointsRouter);
   adminRoutes.route("/entities", entitiesRouter);
-  adminRoutes.route("/users/:userId/analytics", analyticsRouter);
+  adminRoutes.route("/entities/:entitySlug/analytics", analyticsRouter);
 
   routes.route("/", adminRoutes);
 

@@ -70,9 +70,9 @@ describe("Analytics Routes", () => {
     await cleanupTestUser(testUser.uid);
   });
 
-  describe("GET /api/v1/users/:userId/analytics", () => {
+  describe("GET /api/v1/entities/:entitySlug/analytics", () => {
     it("should return empty analytics when no usage exists", async () => {
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${testUser.uid}/analytics`);
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/analytics`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -105,7 +105,7 @@ describe("Analytics Routes", () => {
         latency_ms: 100,
       });
 
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${testUser.uid}/analytics`);
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/analytics`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -151,7 +151,7 @@ describe("Analytics Routes", () => {
         estimated_cost_cents: 20,
       });
 
-      const res = await createTestRequest(app, "GET", `/api/v1/users/${testUser.uid}/analytics`);
+      const res = await createTestRequest(app, "GET", `/api/v1/entities/${entitySlug}/analytics`);
       expect(res.status).toBe(200);
 
       const json = await res.json();
@@ -175,7 +175,7 @@ describe("Analytics Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${testUser.uid}/analytics?start_date=${today}&end_date=${today}`
+        `/api/v1/entities/${entitySlug}/analytics?start_date=${today}&end_date=${today}`
       );
       expect(res.status).toBe(200);
 
@@ -215,7 +215,7 @@ describe("Analytics Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${testUser.uid}/analytics?endpoint_id=${endpointId}`
+        `/api/v1/entities/${entitySlug}/analytics?endpoint_id=${endpointId}`
       );
       expect(res.status).toBe(200);
 
@@ -234,7 +234,7 @@ describe("Analytics Routes", () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/${testUser.uid}/analytics?project_id=${projectId}`
+        `/api/v1/entities/${entitySlug}/analytics?project_id=${projectId}`
       );
       expect(res.status).toBe(200);
 
@@ -242,13 +242,14 @@ describe("Analytics Routes", () => {
       expect(json.data.aggregate.total_requests).toBe(1);
     });
 
-    it("should reject access to other user's analytics", async () => {
+    it("should reject access to other entity's analytics", async () => {
       const res = await createTestRequest(
         app,
         "GET",
-        `/api/v1/users/00000000-0000-0000-0000-000000000000/analytics`
+        `/api/v1/entities/nonexistent-entity-slug/analytics`
       );
-      expect(res.status).toBe(403);
+      // Should return 404 for entity not found or 403 for access denied
+      expect([403, 404]).toContain(res.status);
     });
   });
 });

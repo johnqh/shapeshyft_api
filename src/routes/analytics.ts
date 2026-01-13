@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and, gte, lte, sql, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { db, projects, endpoints, usageAnalytics, entities, entityMembers } from "../db";
 import { analyticsQuerySchema } from "../schemas";
 import {

@@ -61,7 +61,7 @@ export const llmProviderSchema = z.enum([
   "openai",
   "gemini",
   "anthropic",
-  "llm_server",
+  "lm_studio",
 ]);
 
 export const httpMethodSchema = z.enum(["GET", "POST"]);
@@ -97,15 +97,15 @@ export const keyCreateSchema = z
   .refine(
     data => {
       // For API-based providers, api_key is required
-      if (data.provider !== "llm_server") {
+      if (data.provider !== "lm_studio") {
         return !!data.api_key;
       }
-      // For llm_server, endpoint_url is required
+      // For lm_studio, endpoint_url is required
       return !!data.endpoint_url;
     },
     {
       message:
-        "api_key is required for API providers, endpoint_url is required for llm_server",
+        "api_key is required for API providers, endpoint_url is required for lm_studio",
     }
   );
 

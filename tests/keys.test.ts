@@ -103,11 +103,11 @@ describe("Keys Routes", () => {
       expect(json.data.is_active).toBe(true);
     });
 
-    it("should create a new key with endpoint URL for llm_server", async () => {
+    it("should create a new key with endpoint URL for lm_studio", async () => {
       const res = await createTestRequest(app, "POST", `/api/v1/entities/${entitySlug}/keys`, {
         body: {
           key_name: "My LLM Server",
-          provider: "llm_server",
+          provider: "lm_studio",
           endpoint_url: "http://localhost:8080/generate",
         },
       });
@@ -116,7 +116,7 @@ describe("Keys Routes", () => {
 
       const json = await res.json();
       expect(json.success).toBe(true);
-      expect(json.data.provider).toBe("llm_server");
+      expect(json.data.provider).toBe("lm_studio");
       expect(json.data.endpoint_url).toBe("http://localhost:8080/generate");
     });
 

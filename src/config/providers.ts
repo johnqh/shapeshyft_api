@@ -98,7 +98,7 @@ export const PROVIDERS: ProviderConfig[] = [
     requiresEndpointUrl: false,
   },
   {
-    id: "llm_server",
+    id: "lm_studio",
     name: "LM Studio / Custom",
     description: "Local LLM server or custom OpenAI-compatible endpoint",
     allowsCustomModel: true,
@@ -161,7 +161,7 @@ export const PROVIDER_MODELS: Record<LlmProvider, string[]> = {
     "sonar-reasoning", "sonar-reasoning-pro",
     "sonar-deep-research",
   ],
-  llm_server: [
+  lm_studio: [
     // Text models (trending on LM Studio January 2026)
     "openai/gpt-oss-20b", "openai/gpt-oss-120b", "deepseek/deepseek-r1-0528-qwen3-8b",
     "qwen/qwen3-8b", "qwen/qwen3-14b", "qwen/qwen3-30b-a3b-2507", "qwen/qwen3-4b-2507",

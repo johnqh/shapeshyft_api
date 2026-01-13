@@ -35,7 +35,7 @@ export function createLLMProvider(
     case "perplexity":
     case "cohere":
       return new OpenAIProvider(config); // Most use OpenAI-compatible format
-    case "llm_server":
+    case "lm_studio":
       return new CustomLLMProvider(config);
     default:
       throw new Error(`Unknown provider type: ${providerType}`);
@@ -55,5 +55,5 @@ export const PROVIDER_ENDPOINTS: Record<LlmProvider, string> = {
   xai: "https://api.x.ai/v1/chat/completions",
   deepseek: "https://api.deepseek.com/v1/chat/completions",
   perplexity: "https://api.perplexity.ai/chat/completions",
-  llm_server: "{custom_endpoint}",
+  lm_studio: "{custom_endpoint}",
 };

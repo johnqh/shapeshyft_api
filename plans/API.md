@@ -86,9 +86,9 @@ shapeshyft_api/
 | uuid | UUID | PK, auto |
 | user_id | UUID | FK → users, cascade |
 | key_name | VARCHAR(255) | Not null |
-| provider | ENUM | 'openai', 'gemini', 'anthropic', 'llm_server' |
+| provider | ENUM | 'openai', 'gemini', 'anthropic', 'lm_studio' |
 | encrypted_api_key | TEXT | For API providers |
-| endpoint_url | TEXT | For llm_server |
+| endpoint_url | TEXT | For lm_studio |
 | encryption_iv | VARCHAR(32) | AES IV hex |
 | is_active | BOOLEAN | Default true |
 | created_at/updated_at | TIMESTAMP | |

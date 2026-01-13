@@ -35,7 +35,7 @@ export const llmProviderEnum = pgEnum("llm_provider", [
   "xai",
   "deepseek",
   "perplexity",
-  "llm_server",
+  "lm_studio",
 ]);
 
 export const httpMethodEnum = pgEnum("http_method", ["GET", "POST"]);

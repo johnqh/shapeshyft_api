@@ -321,7 +321,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
         additionalInstructions: "Focus on the specific data requested, not general information.",
       };
 
-    case "llm_server":
+    case "lm_studio":
     default:
       return {
         baseInstruction: "You are a helpful assistant that produces structured data output.",

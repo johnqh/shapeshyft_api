@@ -10,7 +10,7 @@ import type {
  * Expects the endpoint to follow OpenAI-compatible format.
  */
 export class CustomLLMProvider implements ILLMProvider {
-  readonly providerName = "llm_server" as const;
+  readonly providerName = "lm_studio" as const;
   private endpointUrl: string;
   private timeout: number;
 

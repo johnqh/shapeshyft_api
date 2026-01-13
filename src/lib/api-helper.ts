@@ -40,7 +40,7 @@ function getProviderNotes(provider: LlmProvider): string {
       return "Note: This prompt is optimized for Anthropic models (Claude)";
     case "gemini":
       return "Note: This prompt is optimized for Google Gemini models";
-    case "llm_server":
+    case "lm_studio":
       return "Note: This prompt is designed for custom LLM servers";
     default:
       return "";
@@ -146,7 +146,7 @@ export const ApiHelper = {
     };
 
     const endpointUrl =
-      input.provider === "llm_server"
+      input.provider === "lm_studio"
         ? input.providerConfig.endpointUrl!
         : PROVIDER_ENDPOINTS[input.provider];
 

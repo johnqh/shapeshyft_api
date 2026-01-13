@@ -39,7 +39,7 @@ export async function initDatabase() {
   // Create enums (if they don't exist)
   await client`
     DO $$ BEGIN
-      CREATE TYPE shapeshyft.llm_provider AS ENUM ('openai', 'anthropic', 'gemini', 'mistral', 'cohere', 'groq', 'xai', 'deepseek', 'perplexity', 'llm_server');
+      CREATE TYPE shapeshyft.llm_provider AS ENUM ('openai', 'anthropic', 'gemini', 'mistral', 'cohere', 'groq', 'xai', 'deepseek', 'perplexity', 'lm_studio');
     EXCEPTION
       WHEN duplicate_object THEN null;
     END $$;
@@ -72,6 +72,10 @@ export async function initDatabase() {
       -- Add perplexity if not exists
       IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'perplexity' AND enumtypid = 'shapeshyft.llm_provider'::regtype) THEN
         ALTER TYPE shapeshyft.llm_provider ADD VALUE 'perplexity';
+      END IF;
+      -- Add lm_studio if not exists
+      IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'lm_studio' AND enumtypid = 'shapeshyft.llm_provider'::regtype) THEN
+        ALTER TYPE shapeshyft.llm_provider ADD VALUE 'lm_studio';
       END IF;
     END $$;
   `;

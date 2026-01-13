@@ -354,7 +354,7 @@ describe("Prompt Builder", () => {
       "xai",
       "deepseek",
       "perplexity",
-      "llm_server",
+      "lm_studio",
     ];
 
     it("should return config for all providers", () => {
@@ -400,7 +400,7 @@ describe("Prompt Builder", () => {
         "openai",
         "anthropic",
         "gemini",
-        "llm_server",
+        "lm_studio",
       ];
 
       for (const provider of providers) {

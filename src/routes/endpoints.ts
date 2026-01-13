@@ -191,6 +191,7 @@ endpointsRouter.post(
         display_name: body.display_name,
         http_method: body.http_method ?? "POST",
         llm_key_id: body.llm_key_id,
+        model: body.model ?? null,
         input_schema: body.input_schema ?? null,
         output_schema: body.output_schema ?? null,
         instructions: body.instructions ?? null,
@@ -275,6 +276,14 @@ endpointsRouter.put(
           ? body.ip_allowlist
           : current.ip_allowlist;
 
+    // Handle model - null means clear, undefined means keep current
+    const model =
+      body.model === null
+        ? null
+        : body.model !== undefined
+          ? body.model
+          : current.model;
+
     const rows = await db
       .update(endpoints)
       .set({
@@ -282,6 +291,7 @@ endpointsRouter.put(
         display_name: body.display_name ?? current.display_name,
         http_method: body.http_method ?? current.http_method,
         llm_key_id: body.llm_key_id ?? current.llm_key_id,
+        model: model,
         input_schema: body.input_schema ?? current.input_schema,
         output_schema: body.output_schema ?? current.output_schema,
         instructions: body.instructions ?? current.instructions,

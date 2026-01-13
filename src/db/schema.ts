@@ -154,6 +154,7 @@ export const endpoints = shapeshyftSchema.table(
     llm_key_id: uuid("llm_key_id")
       .notNull()
       .references(() => llmApiKeys.uuid, { onDelete: "restrict" }),
+    model: varchar("model", { length: 255 }),
     input_schema: jsonb("input_schema"),
     output_schema: jsonb("output_schema"),
     instructions: text("instructions"),

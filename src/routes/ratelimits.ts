@@ -27,10 +27,8 @@ function getTestMode(c: any): boolean {
 /**
  * Check if RevenueCat is configured
  */
-function isRevenueCatConfigured(testMode: boolean = false): boolean {
-  const key = testMode
-    ? getEnv("REVENUECAT_API_KEY_SANDBOX")
-    : getEnv("REVENUECAT_API_KEY");
+function isRevenueCatConfigured(): boolean {
+  const key = getEnv("REVENUECAT_API_KEY");
   return !!key && key.length > 0;
 }
 
@@ -89,7 +87,7 @@ ratelimitsRouter.get("/", async c => {
     const testMode = getTestMode(c);
 
     // If RevenueCat is not configured, return static config without usage data
-    if (!isRevenueCatConfigured(testMode)) {
+    if (!isRevenueCatConfigured()) {
       const noneLimits = rateLimitsConfig.none;
       // Convert flat config to tiers array format
       const tiers = Object.entries(rateLimitsConfig).map(([entitlement, limits]) => ({
@@ -132,8 +130,10 @@ ratelimitsRouter.get("/", async c => {
     }
 
     // Use entity ID for rate limits (subscriptions are per-entity)
-    const data = await getRateLimitRouteHandler(testMode).getRateLimitsConfigData(
-      entityId
+    // testMode is passed to the method to filter sandbox purchases
+    const data = await getRateLimitRouteHandler().getRateLimitsConfigData(
+      entityId,
+      testMode
     );
 
     return c.json(successResponse(data) as RateLimitsConfigResponse);
@@ -167,7 +167,7 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     }
 
     // If RevenueCat is not configured, return empty history
-    if (!isRevenueCatConfigured(testMode)) {
+    if (!isRevenueCatConfigured()) {
       return c.json(successResponse({
         periodType: periodTypeParam as RateLimitPeriodType,
         entries: [],
@@ -191,9 +191,12 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     }
 
     // Use entity ID for rate limits (subscriptions are per-entity)
-    const data = await getRateLimitRouteHandler(testMode).getRateLimitHistoryData(
+    // testMode is passed to the method to filter sandbox purchases
+    const data = await getRateLimitRouteHandler().getRateLimitHistoryData(
       entityId,
-      periodType
+      periodType,
+      100, // default limit
+      testMode
     );
 
     return c.json(successResponse(data) as RateLimitHistoryResponse);

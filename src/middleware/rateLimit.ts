@@ -25,10 +25,7 @@ export const rateLimitsConfig: RateLimitsConfig = {
 
 // Lazy-initialized instances to avoid requiring env vars at module load time
 let _rateLimitRouteHandler: RateLimitRouteHandler | null = null;
-let _rateLimitRouteHandlerSandbox: RateLimitRouteHandler | null = null;
 let _rateLimitMiddleware: ReturnType<typeof createRateLimitMiddleware> | null =
-  null;
-let _rateLimitMiddlewareSandbox: ReturnType<typeof createRateLimitMiddleware> | null =
   null;
 
 export const entitlementDisplayNames: Record<string, string> = {
@@ -41,22 +38,9 @@ export const entitlementDisplayNames: Record<string, string> = {
 /**
  * Get the route handler for rate limit endpoints.
  * Lazily initialized to avoid requiring REVENUECAT_API_KEY at module load time.
- * @param testMode - If true, use sandbox API key
+ * Uses single API key - testMode is passed to individual methods to filter sandbox purchases.
  */
-export function getRateLimitRouteHandler(testMode: boolean = false): RateLimitRouteHandler {
-  if (testMode) {
-    if (!_rateLimitRouteHandlerSandbox) {
-      _rateLimitRouteHandlerSandbox = new RateLimitRouteHandler({
-        revenueCatApiKey: getRequiredEnv("REVENUECAT_API_KEY_SANDBOX"),
-        rateLimitsConfig,
-        db: db as any,
-        rateLimitsTable: rateLimitCounters as any,
-        entitlementDisplayNames,
-      });
-    }
-    return _rateLimitRouteHandlerSandbox;
-  }
-
+export function getRateLimitRouteHandler(): RateLimitRouteHandler {
   if (!_rateLimitRouteHandler) {
     _rateLimitRouteHandler = new RateLimitRouteHandler({
       revenueCatApiKey: getRequiredEnv("REVENUECAT_API_KEY"),
@@ -72,30 +56,9 @@ export function getRateLimitRouteHandler(testMode: boolean = false): RateLimitRo
 /**
  * Get the rate limit middleware for shapeshyft_api.
  * Lazily initialized to avoid requiring REVENUECAT_API_KEY at module load time.
- * @param testMode - If true, use sandbox API key
+ * Uses single API key - testMode is extracted from URL query parameter to filter sandbox purchases.
  */
-function getRateLimitMiddleware(testMode: boolean = false): ReturnType<typeof createRateLimitMiddleware> {
-  const getUserId = (c: any) => {
-    const firebaseUser = c.get("firebaseUser");
-    if (!firebaseUser) {
-      throw new Error("Firebase user not found in context");
-    }
-    return firebaseUser.uid;
-  };
-
-  if (testMode) {
-    if (!_rateLimitMiddlewareSandbox) {
-      _rateLimitMiddlewareSandbox = createRateLimitMiddleware({
-        revenueCatApiKey: getRequiredEnv("REVENUECAT_API_KEY_SANDBOX"),
-        rateLimitsConfig,
-        db: db as any,
-        rateLimitsTable: rateLimitCounters as any,
-        getUserId,
-      });
-    }
-    return _rateLimitMiddlewareSandbox;
-  }
-
+function getRateLimitMiddleware(): ReturnType<typeof createRateLimitMiddleware> {
   if (!_rateLimitMiddleware) {
     _rateLimitMiddleware = createRateLimitMiddleware({
       revenueCatApiKey: getRequiredEnv("REVENUECAT_API_KEY"),
@@ -104,19 +67,29 @@ function getRateLimitMiddleware(testMode: boolean = false): ReturnType<typeof cr
       // when using bun link for local development
       db: db as any,
       rateLimitsTable: rateLimitCounters as any,
-      getUserId,
+      getUserId: (c: any) => {
+        const firebaseUser = c.get("firebaseUser");
+        if (!firebaseUser) {
+          throw new Error("Firebase user not found in context");
+        }
+        return firebaseUser.uid;
+      },
+      getTestMode: (c: any) => {
+        const url = new URL(c.req.url);
+        return url.searchParams.get("testMode") === "true";
+      },
     });
   }
   return _rateLimitMiddleware;
 }
 
 /**
- * Extract testMode from URL query parameter
+ * Extract testMode from URL query parameter.
+ * Exported for use by route handlers that need to pass testMode to RateLimitRouteHandler methods.
  */
-function getTestMode(c: Context): boolean {
+export function getTestMode(c: Context): boolean {
   const url = new URL(c.req.url);
-  const testMode = url.searchParams.get("testMode");
-  return testMode === "true";
+  return url.searchParams.get("testMode") === "true";
 }
 
 /**
@@ -125,8 +98,7 @@ function getTestMode(c: Context): boolean {
  * Automatically detects testMode from URL query parameter.
  */
 export async function rateLimitHandler(c: Context, next: Next) {
-  const testMode = getTestMode(c);
   // Cast to any to avoid type conflicts between different hono instances
-  const middleware = getRateLimitMiddleware(testMode);
+  const middleware = getRateLimitMiddleware();
   await middleware(c as any, next as any);
 }

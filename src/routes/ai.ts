@@ -31,10 +31,10 @@ import {
 } from "../lib/api-key";
 import { getEnv } from "../lib/env-helper";
 import {
-  RevenueCatHelper,
   EntitlementHelper,
   RateLimitChecker,
 } from "@sudobility/ratelimit_service";
+import { SubscriptionHelper } from "@sudobility/subscription_service";
 
 const aiRouter = new Hono();
 
@@ -141,27 +141,21 @@ async function findEntityBySlug(
 
 
 // Lazy-initialized rate limit helpers
-let _revenueCatHelper: RevenueCatHelper | null = null;
-let _revenueCatHelperSandbox: RevenueCatHelper | null = null;
+let _subscriptionHelper: SubscriptionHelper | null = null;
 let _entitlementHelper: EntitlementHelper | null = null;
 let _rateLimitChecker: RateLimitChecker | null = null;
 
-function getRevenueCatHelper(testMode: boolean = false): RevenueCatHelper | null {
-  if (testMode) {
-    const apiKey = getEnv("REVENUECAT_API_KEY_SANDBOX");
-    if (!apiKey) return null;
-    if (!_revenueCatHelperSandbox) {
-      _revenueCatHelperSandbox = new RevenueCatHelper({ apiKey });
-    }
-    return _revenueCatHelperSandbox;
-  }
-
+/**
+ * Get subscription helper (singleton, lazily initialized).
+ * Uses single API key - testMode is passed to getSubscriptionInfo to filter sandbox purchases.
+ */
+function getSubscriptionHelper(): SubscriptionHelper | null {
   const apiKey = getEnv("REVENUECAT_API_KEY");
   if (!apiKey) return null;
-  if (!_revenueCatHelper) {
-    _revenueCatHelper = new RevenueCatHelper({ apiKey });
+  if (!_subscriptionHelper) {
+    _subscriptionHelper = new SubscriptionHelper({ revenueCatApiKey: apiKey });
   }
-  return _revenueCatHelper;
+  return _subscriptionHelper;
 }
 
 function getEntitlementHelper(): EntitlementHelper {
@@ -200,15 +194,16 @@ async function checkRateLimit(
   entityId: string
 ): Promise<Response | null> {
   const testMode = getTestMode(c);
-  const rcHelper = getRevenueCatHelper(testMode);
-  if (!rcHelper) {
+  const subHelper = getSubscriptionHelper();
+  if (!subHelper) {
     // RevenueCat not configured - skip rate limiting
     return null;
   }
 
   try {
     // Use entityId as RevenueCat subscriber ID
-    const subscriptionInfo = await rcHelper.getSubscriptionInfo(entityId);
+    // testMode is passed to filter sandbox purchases in production mode
+    const subscriptionInfo = await subHelper.getSubscriptionInfo(entityId, testMode);
     const limits = getEntitlementHelper().getRateLimits(subscriptionInfo.entitlements);
     const result = await getRateLimitChecker().checkAndIncrement(
       entityId,

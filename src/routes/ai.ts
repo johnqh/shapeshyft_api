@@ -486,6 +486,7 @@ async function handleAIRequest(c: any) {
     prompt: prompts.user,
     systemPrompt: prompts.system,
     outputSchema: (endpoint.output_schema as JsonSchema) ?? { type: "object" },
+    model: endpoint.model ?? undefined,
   };
 
   // 4. Call LLM and return response

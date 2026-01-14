@@ -204,11 +204,18 @@ export class CustomLLMProvider implements ILLMProvider {
 
     // Use simple payload for custom LLM servers - rely on system prompt for JSON formatting
     // Many servers don't support response_format or tools
-    return {
+    const payload: Record<string, unknown> = {
       messages,
       temperature: request.temperature ?? 0,
       max_tokens: request.maxTokens,
     };
+
+    // Include model if specified (required when multiple models are loaded, e.g., LM Studio)
+    if (request.model) {
+      payload.model = request.model;
+    }
+
+    return payload;
   }
 
   /**

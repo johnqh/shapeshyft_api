@@ -23,6 +23,15 @@ app.get("/", c => {
   );
 });
 
+// Health endpoint (public, no auth)
+app.get("/health", c => {
+  return c.json(
+    successResponse({
+      status: "healthy",
+    })
+  );
+});
+
 // API routes
 app.route("/api/v1", routes);
 

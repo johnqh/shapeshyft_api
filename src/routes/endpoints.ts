@@ -207,6 +207,8 @@ endpointsRouter.post(
           output_schema: body.output_schema ?? null,
           instructions: body.instructions ?? null,
           context: body.context ?? null,
+          expects_media_output: body.expects_media_output ?? null,
+          output_media_format: body.output_media_format ?? null,
         })
         .returning();
 
@@ -305,6 +307,14 @@ endpointsRouter.put(
           context: handleNullable(body.context, current.context),
           is_active: body.is_active ?? current.is_active,
           ip_allowlist: handleNullable(body.ip_allowlist, current.ip_allowlist),
+          expects_media_output: handleNullable(
+            body.expects_media_output,
+            current.expects_media_output
+          ),
+          output_media_format: handleNullable(
+            body.output_media_format,
+            current.output_media_format
+          ),
           updated_at: new Date(),
         })
         .where(eq(endpoints.uuid, endpointId))

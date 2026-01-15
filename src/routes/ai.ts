@@ -35,6 +35,12 @@ import {
   RateLimitChecker,
 } from "@sudobility/ratelimit_service";
 import { SubscriptionHelper } from "@sudobility/subscription_service";
+import { extractMediaFromInput } from "../lib/media-utils";
+import {
+  validateMediaCapabilities,
+  validateWhisperRequest,
+  isTranscriptionModel,
+} from "../lib/capability-validator";
 
 const aiRouter = new Hono();
 
@@ -467,22 +473,75 @@ async function handleAIRequest(c: any) {
     return rateLimitResponse;
   }
 
+  // Extract media from input data
+  const extractionResult = extractMediaFromInput(
+    inputData as Record<string, unknown>
+  );
+  if (extractionResult.error) {
+    return c.json(errorResponse(extractionResult.error), 400);
+  }
+  const { cleanedInput, media } = extractionResult.result!;
+
+  // Determine model (from endpoint config)
+  const model = endpoint.model ?? undefined;
+
+  // Validate media capabilities if media was extracted
+  if (media.length > 0 && model) {
+    const validation = validateMediaCapabilities({
+      model,
+      provider: llmKey.provider,
+      inputMedia: media,
+      expectsOutput: {
+        // For now, we don't have explicit output config in endpoints
+        // This can be extended when we add output media support
+      },
+    });
+
+    if (!validation.valid) {
+      return c.json(errorResponse(validation.errors.join("; ")), 400);
+    }
+
+    // Additional Whisper validation
+    if (isTranscriptionModel(model)) {
+      const whisperValidation = validateWhisperRequest(model, media);
+      if (!whisperValidation.valid) {
+        return c.json(errorResponse(whisperValidation.errors.join("; ")), 400);
+      }
+    }
+  }
+
   // Build the prompts for LLM call (providers expect system/user format)
+  // Use cleaned input (media replaced with placeholders)
   const prompts = ApiHelper.buildLegacyPrompts({
-    inputData,
+    inputData: cleanedInput,
     outputSchema: endpoint.output_schema as JsonSchema | null,
     instructions: endpoint.instructions,
     context: endpoint.context,
     provider: llmKey.provider,
   });
 
-  // Create LLM request
-  const llmRequest: LLMRequest = {
+  // Parse media output configuration from endpoint
+  const expectsMediaOutput = endpoint.expects_media_output as {
+    audio?: boolean;
+    image?: boolean;
+    video?: boolean;
+  } | null;
+
+  // Create LLM request with media
+  // Use proper discriminated union based on output format
+  const baseRequest = {
     prompt: prompts.user,
     systemPrompt: prompts.system,
     outputSchema: (endpoint.output_schema as JsonSchema) ?? { type: "object" },
-    model: endpoint.model ?? undefined,
+    model,
+    media: media.length > 0 ? media : undefined,
+    expectsMediaOutput: expectsMediaOutput ?? undefined,
   };
+
+  const llmRequest: LLMRequest =
+    endpoint.output_media_format === "url"
+      ? { ...baseRequest, outputMediaFormat: "url" as const, entityId: endpoint.uuid }
+      : { ...baseRequest, outputMediaFormat: "base64" as const };
 
   // 4. Call LLM and return response
   // Decrypt API key
@@ -532,18 +591,36 @@ async function handleAIRequest(c: any) {
       },
     });
 
-    // 7. Return response
-    return c.json(
-      successResponse({
-        output: llmResponse.content,
-        usage: {
-          tokens_input: llmResponse.usage.promptTokens,
-          tokens_output: llmResponse.usage.completionTokens,
-          latency_ms: llmResponse.latencyMs,
-          estimated_cost_cents: Math.round(costCents * 100),
-        },
-      })
-    );
+    // 7. Return response with generated media if present
+    const response: {
+      output: unknown;
+      usage: {
+        tokens_input: number;
+        tokens_output: number;
+        latency_ms: number;
+        estimated_cost_cents: number;
+      };
+      generated_media?: Array<{
+        type: string;
+        mimeType: string;
+        data: string;
+      }>;
+    } = {
+      output: llmResponse.content,
+      usage: {
+        tokens_input: llmResponse.usage.promptTokens,
+        tokens_output: llmResponse.usage.completionTokens,
+        latency_ms: llmResponse.latencyMs,
+        estimated_cost_cents: Math.round(costCents * 100),
+      },
+    };
+
+    // Include generated media if present
+    if (llmResponse.generatedMedia && llmResponse.generatedMedia.length > 0) {
+      response.generated_media = llmResponse.generatedMedia;
+    }
+
+    return c.json(successResponse(response));
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";

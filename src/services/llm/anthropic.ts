@@ -34,11 +34,44 @@ export class AnthropicProvider implements ILLMProvider {
       },
     ];
 
+    // Build multimodal content blocks
+    const userContent: Anthropic.ContentBlockParam[] = [];
+
+    // Add media blocks first (images only for Claude)
+    if (request.media?.length) {
+      for (const m of request.media) {
+        if (m.type === "image") {
+          if (m.format === "base64") {
+            userContent.push({
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: m.mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                data: m.data,
+              },
+            });
+          } else if (m.format === "url") {
+            userContent.push({
+              type: "image",
+              source: {
+                type: "url",
+                url: m.data,
+              },
+            });
+          }
+        }
+        // Claude doesn't support audio/video input currently
+      }
+    }
+
+    // Add text prompt
+    userContent.push({ type: "text", text: request.prompt });
+
     const response = await this.client.messages.create({
       model,
       max_tokens: request.maxTokens ?? 4096,
       system: request.systemPrompt,
-      messages: [{ role: "user", content: request.prompt }],
+      messages: [{ role: "user", content: userContent }],
       tools,
       tool_choice: { type: "tool", name: "structured_response" },
       temperature: request.temperature ?? 0,
@@ -75,11 +108,43 @@ export class AnthropicProvider implements ILLMProvider {
   buildApiPayload(request: LLMRequest): Record<string, unknown> {
     const model = request.model ?? this.defaultModel;
 
+    // Build multimodal content blocks
+    const userContent: Anthropic.ContentBlockParam[] = [];
+
+    // Add media blocks first (images only for Claude)
+    if (request.media?.length) {
+      for (const m of request.media) {
+        if (m.type === "image") {
+          if (m.format === "base64") {
+            userContent.push({
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: m.mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                data: m.data,
+              },
+            });
+          } else if (m.format === "url") {
+            userContent.push({
+              type: "image",
+              source: {
+                type: "url",
+                url: m.data,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    // Add text prompt
+    userContent.push({ type: "text", text: request.prompt });
+
     return {
       model,
       max_tokens: request.maxTokens ?? 4096,
       system: request.systemPrompt,
-      messages: [{ role: "user", content: request.prompt }],
+      messages: [{ role: "user", content: userContent }],
       tools: [
         {
           name: "structured_response",

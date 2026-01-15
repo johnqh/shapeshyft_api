@@ -162,6 +162,10 @@ export const endpoints = shapeshyftSchema.table(
     is_active: boolean("is_active").default(true),
     // IP Allowlist - JSON array of IPv4 addresses, null = allow all
     ip_allowlist: jsonb("ip_allowlist"),
+    // Media output configuration - what media types this endpoint expects to generate
+    expects_media_output: jsonb("expects_media_output"),
+    // How to return generated media ("base64" for inline, "url" for cloud storage)
+    output_media_format: varchar("output_media_format", { length: 20 }),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),
   },

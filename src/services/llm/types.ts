@@ -1,4 +1,12 @@
-import type { JsonSchema, LlmProvider } from "@sudobility/shapeshyft_types";
+import type {
+  JsonSchema,
+  LlmProvider,
+  MediaContent,
+  GeneratedMedia,
+} from "@sudobility/shapeshyft_types";
+
+// Re-export types for convenience
+export type { MediaContent, GeneratedMedia, LlmProvider };
 
 // Re-export cost estimation functions from types package
 export {
@@ -11,16 +19,58 @@ export type { ModelPricing } from "@sudobility/shapeshyft_types";
 // Re-export getModelPricing from local providers config (data is now server-side)
 export { getModelPricing } from "../../config/providers";
 
+// =============================================================================
+// LLM Request Types (Discriminated Union)
+// =============================================================================
+
 /**
- * Request to an LLM provider
+ * Base request fields shared by all variants
  */
-export interface LLMRequest {
+interface LLMRequestBase {
   prompt: string;
   systemPrompt?: string;
   outputSchema: JsonSchema;
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  /** Input media (images, audio, video) */
+  media?: MediaContent[];
+  /** What media types this endpoint generates */
+  expectsMediaOutput?: {
+    image?: boolean;
+    audio?: boolean;
+    video?: boolean;
+  };
+}
+
+/**
+ * Request variant when outputMediaFormat is "url" - entityId is REQUIRED
+ */
+interface LLMRequestWithUrlOutput extends LLMRequestBase {
+  outputMediaFormat: "url";
+  entityId: string; // Required for storage lookup
+}
+
+/**
+ * Request variant when outputMediaFormat is "base64" or undefined - entityId is optional
+ */
+interface LLMRequestWithBase64Output extends LLMRequestBase {
+  outputMediaFormat?: "base64";
+  entityId?: string;
+}
+
+/**
+ * Discriminated union ensures entityId is required when outputMediaFormat === "url"
+ */
+export type LLMRequest = LLMRequestWithUrlOutput | LLMRequestWithBase64Output;
+
+/**
+ * Type guard for URL output requests
+ */
+export function requiresEntityId(
+  request: LLMRequest
+): request is LLMRequestWithUrlOutput {
+  return request.outputMediaFormat === "url";
 }
 
 /**
@@ -37,6 +87,8 @@ export interface LLMResponse {
   model: string;
   provider: LlmProvider;
   latencyMs: number;
+  /** Generated media (images, audio, video) from generative models */
+  generatedMedia?: GeneratedMedia[];
 }
 
 /**

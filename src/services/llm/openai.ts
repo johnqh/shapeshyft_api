@@ -1,10 +1,14 @@
 import OpenAI from "openai";
-import type {
-  ILLMProvider,
-  LLMRequest,
-  LLMResponse,
-  ProviderConfig,
+import type { GeneratedMedia } from "@sudobility/shapeshyft_types";
+import {
+  requiresEntityId,
+  type ILLMProvider,
+  type LLMRequest,
+  type LLMResponse,
+  type ProviderConfig,
 } from "./types";
+import { getOpenAIAudioFormat } from "../../lib/media-constants";
+import { getModelCapabilities } from "../../config/providers";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 
@@ -24,13 +28,47 @@ export class OpenAIProvider implements ILLMProvider {
   async generate(request: LLMRequest): Promise<LLMResponse> {
     const model = request.model ?? this.defaultModel;
     const startTime = Date.now();
+    const caps = getModelCapabilities(model);
+    const generatedMedia: GeneratedMedia[] = [];
 
-    // Build messages
+    // Build user message content (multimodal)
+    const userContent: OpenAI.Chat.ChatCompletionContentPart[] = [];
+
+    if (request.media?.length) {
+      for (const m of request.media) {
+        if (m.type === "image") {
+          userContent.push({
+            type: "image_url",
+            image_url: {
+              url:
+                m.format === "base64"
+                  ? `data:${m.mimeType};base64,${m.data}`
+                  : m.data,
+            },
+          });
+        }
+        if (m.type === "audio") {
+          // Format already validated at capability validation layer
+          const format = getOpenAIAudioFormat(m.mimeType);
+          userContent.push({
+            type: "input_audio",
+            input_audio: {
+              data: m.data,
+              format,
+            },
+          } as OpenAI.Chat.ChatCompletionContentPart);
+        }
+      }
+    }
+
+    userContent.push({ type: "text", text: request.prompt });
+
+    // Build messages array
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
     if (request.systemPrompt) {
       messages.push({ role: "system", content: request.systemPrompt });
     }
-    messages.push({ role: "user", content: request.prompt });
+    messages.push({ role: "user", content: userContent });
 
     // Use function calling for structured output
     const tools: OpenAI.Chat.ChatCompletionTool[] = [
@@ -44,9 +82,24 @@ export class OpenAIProvider implements ILLMProvider {
       },
     ];
 
+    // Audio output configuration - ONLY enable when endpoint expects audio output
+    const modalities: ("text" | "audio")[] = ["text"];
+    let audioConfig: { voice: string; format: string } | undefined;
+
+    if (request.expectsMediaOutput?.audio && caps.audioOutput) {
+      modalities.push("audio");
+      // V1: Output audio format is fixed to mp3
+      audioConfig = {
+        voice: "alloy", // V1: Fixed to "alloy"
+        format: "mp3", // V1: Fixed to "mp3"
+      };
+    }
+
     const response = await this.client.chat.completions.create({
       model,
       messages,
+      modalities,
+      audio: audioConfig,
       tools,
       tool_choice: {
         type: "function",
@@ -54,9 +107,37 @@ export class OpenAIProvider implements ILLMProvider {
       },
       temperature: request.temperature ?? 0,
       max_tokens: request.maxTokens,
-    });
+      stream: false,
+    } as OpenAI.Chat.ChatCompletionCreateParams) as OpenAI.Chat.ChatCompletion;
 
     const latencyMs = Date.now() - startTime;
+
+    // Extract audio from response if present
+    const message = response.choices[0]?.message as OpenAI.Chat.ChatCompletionMessage & { audio?: { data: string; format: string } };
+    const audioData = message?.audio;
+    if (audioData) {
+      const audioMimeType = `audio/${audioData.format}`;
+
+      if (requiresEntityId(request)) {
+        // URL output requested but storage upload not implemented in v1
+        // For now, return base64 with a warning in the logs
+        console.warn(
+          "URL output requested but storage upload not implemented. Returning base64."
+        );
+        generatedMedia.push({
+          type: "audio",
+          mimeType: audioMimeType,
+          data: audioData.data,
+        });
+      } else {
+        // Return base64
+        generatedMedia.push({
+          type: "audio",
+          mimeType: audioMimeType,
+          data: audioData.data,
+        });
+      }
+    }
 
     // Extract structured response from function call
     const toolCall = response.choices[0]?.message.tool_calls?.[0];
@@ -78,21 +159,69 @@ export class OpenAIProvider implements ILLMProvider {
       model: response.model,
       provider: this.providerName,
       latencyMs,
+      generatedMedia: generatedMedia.length > 0 ? generatedMedia : undefined,
     };
   }
 
   buildApiPayload(request: LLMRequest): Record<string, unknown> {
     const model = request.model ?? this.defaultModel;
+    const caps = getModelCapabilities(model);
 
-    const messages: { role: string; content: string }[] = [];
+    // Build user message content (multimodal)
+    const userContent: Array<Record<string, unknown>> = [];
+
+    if (request.media?.length) {
+      for (const m of request.media) {
+        if (m.type === "image") {
+          userContent.push({
+            type: "image_url",
+            image_url: {
+              url:
+                m.format === "base64"
+                  ? `data:${m.mimeType};base64,${m.data}`
+                  : m.data,
+            },
+          });
+        }
+        if (m.type === "audio") {
+          const format = getOpenAIAudioFormat(m.mimeType);
+          userContent.push({
+            type: "input_audio",
+            input_audio: {
+              data: m.data,
+              format,
+            },
+          });
+        }
+      }
+    }
+
+    userContent.push({ type: "text", text: request.prompt });
+
+    // Build messages array
+    const messages: Array<Record<string, unknown>> = [];
     if (request.systemPrompt) {
       messages.push({ role: "system", content: request.systemPrompt });
     }
-    messages.push({ role: "user", content: request.prompt });
+    messages.push({ role: "user", content: userContent });
+
+    // Audio output configuration
+    const modalities: string[] = ["text"];
+    let audioConfig: Record<string, unknown> | undefined;
+
+    if (request.expectsMediaOutput?.audio && caps.audioOutput) {
+      modalities.push("audio");
+      audioConfig = {
+        voice: "alloy",
+        format: "mp3",
+      };
+    }
 
     return {
       model,
       messages,
+      modalities,
+      audio: audioConfig,
       tools: [
         {
           type: "function",

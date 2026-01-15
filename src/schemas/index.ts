@@ -156,6 +156,22 @@ export const ipv4Schema = z.string().regex(ipv4Regex, "Invalid IPv4 address");
 
 export const ipAllowlistSchema = z.array(ipv4Schema).nullable().optional();
 
+// Media output configuration schema
+export const mediaOutputConfigSchema = z
+  .object({
+    audio: z.boolean().optional(),
+    image: z.boolean().optional(),
+    video: z.boolean().optional(),
+  })
+  .nullable()
+  .optional();
+
+// Output media format schema
+export const outputMediaFormatSchema = z
+  .enum(["base64", "url"])
+  .nullable()
+  .optional();
+
 export const endpointCreateSchema = z.object({
   endpoint_name: z
     .string()
@@ -173,6 +189,8 @@ export const endpointCreateSchema = z.object({
   output_schema: jsonSchemaSchema.optional(),
   instructions: z.string().max(10000).optional(),
   context: z.string().max(10000).optional(),
+  expects_media_output: mediaOutputConfigSchema,
+  output_media_format: outputMediaFormatSchema,
 });
 
 export const endpointUpdateSchema = z.object({
@@ -187,6 +205,8 @@ export const endpointUpdateSchema = z.object({
   context: z.string().max(10000).nullable().optional(),
   is_active: z.boolean().optional(),
   ip_allowlist: ipAllowlistSchema,
+  expects_media_output: mediaOutputConfigSchema,
+  output_media_format: outputMediaFormatSchema,
 });
 
 // =============================================================================

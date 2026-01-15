@@ -120,7 +120,7 @@ export async function initDatabase() {
   // =============================================================================
 
   await runEntityMigration({
-    client,
+    client: client as any, // Cast to any due to postgres type version mismatch with bun link
     schemaName: "shapeshyft",
     indexPrefix: "shapeshyft",
     migrateProjects: false, // Tables are created fresh with entity_id

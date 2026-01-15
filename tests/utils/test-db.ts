@@ -154,8 +154,8 @@ export async function createTestEntity(
 
   const entity = rows[0]!;
 
-  // Add user as admin member (personal entities use 'admin', organizations use 'owner')
-  const role = entityType === "personal" ? "admin" : "owner";
+  // Add user as manager member (personal entities use 'manager', organizations use 'owner')
+  const role = entityType === "personal" ? "manager" : "owner";
   await db.insert(entityMembers).values({
     entity_id: entity.id,
     user_id: firebaseUid,

@@ -30,14 +30,14 @@ async function migrate() {
       
       if (llmKeysHasUserId) {
         console.log("Migrating llm_api_keys data from user_id to entity_id...");
-        // Join through entity_members to find user's personal entity (admin role for personal entities)
+        // Join through entity_members to find user's personal entity (manager role for personal entities)
         await client`
           UPDATE shapeshyft.llm_api_keys k
           SET entity_id = e.id
           FROM shapeshyft.entities e
           INNER JOIN shapeshyft.entity_members em ON em.entity_id = e.id
           WHERE em.user_id = k.user_id
-            AND em.role = 'admin'
+            AND em.role = 'manager'
             AND em.is_active = true
             AND e.entity_type = 'personal'
             AND k.entity_id IS NULL
@@ -74,14 +74,14 @@ async function migrate() {
       
       if (projectsHasUserId) {
         console.log("Migrating projects data from user_id to entity_id...");
-        // Join through entity_members to find user's personal entity (admin role for personal entities)
+        // Join through entity_members to find user's personal entity (manager role for personal entities)
         await client`
           UPDATE shapeshyft.projects p
           SET entity_id = e.id
           FROM shapeshyft.entities e
           INNER JOIN shapeshyft.entity_members em ON em.entity_id = e.id
           WHERE em.user_id = p.user_id
-            AND em.role = 'admin'
+            AND em.role = 'manager'
             AND em.is_active = true
             AND e.entity_type = 'personal'
             AND p.entity_id IS NULL

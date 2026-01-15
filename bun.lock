@@ -10,11 +10,11 @@
         "@google-cloud/storage": "^7.18.0",
         "@google/generative-ai": "^0.21.0",
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/entity_service": "^1.0.11",
+        "@sudobility/entity_service": "link:@sudobility/entity_service",
         "@sudobility/ratelimit_service": "^1.0.14",
         "@sudobility/shapeshyft_types": "^1.0.32",
         "@sudobility/subscription_service": "^1.0.1",
-        "@sudobility/types": "^1.9.44",
+        "@sudobility/types": "link:@sudobility/types",
         "drizzle-orm": "^0.45.0",
         "firebase-admin": "^13.6.0",
         "groq-sdk": "^0.37.0",
@@ -433,7 +433,7 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.11", "", { "peerDependencies": { "@sudobility/types": "^1.9.44", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-BV70qkAQHQU8+QMlmVcWa25Hm08IV+Ub+2ege0xP7vzahiRpKXLPYpPcxieK8SaT4tWnE0qxo3GNVQCFUwPRkQ=="],
+    "@sudobility/entity_service": ["@sudobility/entity_service@link:@sudobility/entity_service", {}],
 
     "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.14", "", { "peerDependencies": { "@sudobility/types": "^1.9.44", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-bHMoyiueVJycNE40p8tEzytDvBeSCoNAX2ErYk5g7v2JlRV40FoaiNgfI27oU691+Edp1Y/rB3Kqf9oF9FAD+g=="],
 
@@ -441,7 +441,7 @@
 
     "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.1", "", {}, "sha512-XNgkGrh/MyIaof+qCqHdWku8h8Qd2CwivERFPyVF7bpSRZuYU7AQv48aegDKRvgk+bXTE+vSzM6XtkB8zsqPiw=="],
 
-    "@sudobility/types": ["@sudobility/types@1.9.44", "", {}, "sha512-2oRTD6sQ6Ouwyb4DAerU6FNCkGRaXnzPNwTg7puIzA3ZVTTauN6DzMLw0QzzUiwLHWlVpYZfldZK+IRYOz0LDA=="],
+    "@sudobility/types": ["@sudobility/types@link:@sudobility/types", {}],
 
     "@tootallnate/once": ["@tootallnate/once@2.0.0", "", {}, "sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A=="],
 

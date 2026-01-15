@@ -9,20 +9,12 @@ import type {
   LlmProvider,
   ModelCapabilities,
   ModelPricing,
+  ProviderConfig,
 } from "@sudobility/shapeshyft_types";
 
 // =============================================================================
 // Provider Configuration
 // =============================================================================
-
-export interface ProviderConfig {
-  id: LlmProvider;
-  name: string;
-  description: string;
-  allowsCustomModel: boolean;
-  defaultModel: string;
-  requiresEndpointUrl: boolean;
-}
 
 export const PROVIDERS: ProviderConfig[] = [
   {

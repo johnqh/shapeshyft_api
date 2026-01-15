@@ -26,7 +26,7 @@ export class CustomLLMProvider implements ILLMProvider {
       url = url + "chat/completions";
     }
     this.endpointUrl = url;
-    this.timeout = 120_000; // 2 minutes
+    this.timeout = 600_000; // 10 minutes (local models can be slow)
   }
 
   async generate(request: LLMRequest): Promise<LLMResponse> {

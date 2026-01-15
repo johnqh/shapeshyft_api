@@ -256,6 +256,80 @@ export async function initDatabase() {
 
   await initRateLimitTable(client, "shapeshyft", "shapeshyft");
 
+  // =============================================================================
+  // Step 8: Entity Storage Configs table (for generated media uploads)
+  // =============================================================================
+
+  await client`
+    CREATE TABLE IF NOT EXISTS shapeshyft.entity_storage_configs (
+      uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      entity_id UUID NOT NULL UNIQUE REFERENCES shapeshyft.entities(id) ON DELETE CASCADE,
+      provider VARCHAR(20) NOT NULL,
+      bucket VARCHAR(255) NOT NULL,
+      path_prefix VARCHAR(500),
+      encrypted_credentials TEXT NOT NULL,
+      encryption_iv VARCHAR(32) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      created_by VARCHAR(128) NOT NULL
+    )
+  `;
+
+  // Create index for entity_id lookups
+  await client`
+    CREATE INDEX IF NOT EXISTS shapeshyft_entity_storage_configs_entity_idx
+    ON shapeshyft.entity_storage_configs(entity_id)
+  `;
+
+  // =============================================================================
+  // Step 9: Add multimodal columns to endpoints table (migration for existing DBs)
+  // =============================================================================
+
+  // Add expects_media_output column
+  await client`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'shapeshyft'
+        AND table_name = 'endpoints'
+        AND column_name = 'expects_media_output'
+      ) THEN
+        ALTER TABLE shapeshyft.endpoints ADD COLUMN expects_media_output JSONB;
+      END IF;
+    END $$;
+  `;
+
+  // Add output_media_format column
+  await client`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'shapeshyft'
+        AND table_name = 'endpoints'
+        AND column_name = 'output_media_format'
+      ) THEN
+        ALTER TABLE shapeshyft.endpoints ADD COLUMN output_media_format VARCHAR(20);
+      END IF;
+    END $$;
+  `;
+
+  // Add transcription_extraction_model column
+  await client`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'shapeshyft'
+        AND table_name = 'endpoints'
+        AND column_name = 'transcription_extraction_model'
+      ) THEN
+        ALTER TABLE shapeshyft.endpoints ADD COLUMN transcription_extraction_model VARCHAR(255);
+      END IF;
+    END $$;
+  `;
+
   console.log("Database tables initialized");
 }
 

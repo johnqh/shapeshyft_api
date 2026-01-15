@@ -191,6 +191,8 @@ export const endpointCreateSchema = z.object({
   context: z.string().max(10000).optional(),
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
+  // For Whisper endpoints: model to use for structured extraction
+  transcription_extraction_model: z.string().max(255).nullable().optional(),
 });
 
 export const endpointUpdateSchema = z.object({
@@ -207,6 +209,8 @@ export const endpointUpdateSchema = z.object({
   ip_allowlist: ipAllowlistSchema,
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
+  // For Whisper endpoints: model to use for structured extraction
+  transcription_extraction_model: z.string().max(255).nullable().optional(),
 });
 
 // =============================================================================
@@ -243,4 +247,71 @@ export const settingsUpdateSchema = z.object({
       "Must contain only letters, numbers, and underscores"
     )
     .optional(),
+});
+
+// =============================================================================
+// Storage Config Schemas
+// =============================================================================
+
+export const storageProviderSchema = z.enum(["gcs", "s3"]);
+
+// GCS service account credentials schema
+export const gcsCredentialsSchema = z.object({
+  type: z.literal("service_account"),
+  project_id: z.string().min(1),
+  private_key_id: z.string().min(1),
+  private_key: z.string().min(1),
+  client_email: z.string().email(),
+  client_id: z.string().min(1),
+  auth_uri: z.string().url().optional(),
+  token_uri: z.string().url().optional(),
+  auth_provider_x509_cert_url: z.string().url().optional(),
+  client_x509_cert_url: z.string().url().optional(),
+});
+
+// S3 credentials schema
+export const s3CredentialsSchema = z.object({
+  access_key_id: z.string().min(1),
+  secret_access_key: z.string().min(1),
+  region: z.string().min(1),
+});
+
+// Storage config create schema
+export const storageConfigCreateSchema = z
+  .object({
+    provider: storageProviderSchema,
+    bucket: z.string().min(1).max(255),
+    path_prefix: z.string().max(500).optional(),
+    credentials: z.union([gcsCredentialsSchema, s3CredentialsSchema]),
+  })
+  .refine(
+    data => {
+      // Validate credentials match provider
+      if (data.provider === "gcs") {
+        return "type" in data.credentials && data.credentials.type === "service_account";
+      } else {
+        return "access_key_id" in data.credentials;
+      }
+    },
+    {
+      message: "Credentials must match the storage provider type",
+    }
+  );
+
+// Storage config update schema (credentials optional for partial update)
+export const storageConfigUpdateSchema = z.object({
+  bucket: z.string().min(1).max(255).optional(),
+  path_prefix: z.string().max(500).nullable().optional(),
+  credentials: z.union([gcsCredentialsSchema, s3CredentialsSchema]).optional(),
+});
+
+// Storage config response schema (safe version without credentials)
+export const storageConfigResponseSchema = z.object({
+  uuid: z.string().uuid(),
+  entity_id: z.string().uuid(),
+  provider: storageProviderSchema,
+  bucket: z.string(),
+  path_prefix: z.string().nullable(),
+  created_at: z.string().datetime().nullable(),
+  updated_at: z.string().datetime().nullable(),
 });

@@ -3,6 +3,7 @@ import type { ILLMProvider, ProviderConfig } from "./types";
 import { OpenAIProvider } from "./openai";
 import { AnthropicProvider } from "./anthropic";
 import { GeminiProvider } from "./gemini";
+import { GroqProvider } from "./groq";
 import { CustomLLMProvider } from "./custom";
 
 export type {
@@ -27,9 +28,10 @@ export function createLLMProvider(
       return new AnthropicProvider(config);
     case "gemini":
       return new GeminiProvider(config);
+    case "groq":
+      return new GroqProvider(config); // Groq has dedicated provider for Whisper
     // Providers with OpenAI-compatible API format
     case "mistral":
-    case "groq":
     case "xai":
     case "deepseek":
     case "perplexity":

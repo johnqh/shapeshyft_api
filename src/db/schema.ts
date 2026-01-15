@@ -87,6 +87,37 @@ export const entityInvitations = createEntityInvitationsTable(
 );
 
 // =============================================================================
+// Entity Storage Configs Table
+// User-provided cloud storage configuration for generated media
+// =============================================================================
+
+export const entityStorageConfigs = shapeshyftSchema.table(
+  "entity_storage_configs",
+  {
+    uuid: uuid("uuid").primaryKey().defaultRandom(),
+    entity_id: uuid("entity_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" })
+      .unique(), // One storage config per entity
+    provider: varchar("provider", { length: 20 }).notNull(), // "gcs" | "s3"
+    bucket: varchar("bucket", { length: 255 }).notNull(),
+    path_prefix: varchar("path_prefix", { length: 500 }), // e.g., "shapeshyft/generated/"
+    // Encrypted credentials (same pattern as llm_api_keys)
+    encrypted_credentials: text("encrypted_credentials").notNull(),
+    encryption_iv: varchar("encryption_iv", { length: 32 }).notNull(),
+    // Audit fields
+    created_at: timestamp("created_at").defaultNow(),
+    updated_at: timestamp("updated_at").defaultNow(),
+    created_by: varchar("created_by", { length: 128 }).notNull(), // Firebase UID
+  },
+  table => ({
+    entityIdx: index("shapeshyft_entity_storage_configs_entity_idx").on(
+      table.entity_id
+    ),
+  })
+);
+
+// =============================================================================
 // LLM API Keys Table
 // =============================================================================
 
@@ -166,6 +197,10 @@ export const endpoints = shapeshyftSchema.table(
     expects_media_output: jsonb("expects_media_output"),
     // How to return generated media ("base64" for inline, "url" for cloud storage)
     output_media_format: varchar("output_media_format", { length: 20 }),
+    // For Whisper endpoints: model to use for structured extraction from transcription
+    transcription_extraction_model: varchar("transcription_extraction_model", {
+      length: 255,
+    }),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),
   },

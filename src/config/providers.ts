@@ -583,3 +583,17 @@ export function getModelCapabilities(model: string): ModelCapabilities {
 export function getModelPricing(model: string): ModelPricing {
   return MODEL_PRICING[model] ?? DEFAULT_MODEL_PRICING;
 }
+
+/**
+ * Get the provider for a given model name.
+ * Searches through PROVIDER_MODELS to find which provider owns this model.
+ */
+export function getProviderForModel(model: string): LlmProvider {
+  for (const [provider, models] of Object.entries(PROVIDER_MODELS)) {
+    if (models.includes(model)) {
+      return provider as LlmProvider;
+    }
+  }
+  // Default to openai for unknown models (OpenAI-compatible format)
+  return "openai";
+}

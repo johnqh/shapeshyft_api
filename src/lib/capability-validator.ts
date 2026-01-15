@@ -72,13 +72,15 @@ export function validateMediaCapabilities(
 
   for (const media of ctx.inputMedia) {
     // 1. Check model supports this media type
-    if (media.type === "image" && !caps.visionInput) {
+    // Only block if capability is explicitly false (known to not support)
+    // If undefined (unknown), allow the request and let the provider reject if unsupported
+    if (media.type === "image" && caps.visionInput === false) {
       errors.push(`Model ${ctx.model} does not support image input`);
     }
-    if (media.type === "audio" && !caps.audioInput) {
+    if (media.type === "audio" && caps.audioInput === false) {
       errors.push(`Model ${ctx.model} does not support audio input`);
     }
-    if (media.type === "video" && !caps.videoInput) {
+    if (media.type === "video" && caps.videoInput === false) {
       errors.push(`Model ${ctx.model} does not support video input`);
     }
 
@@ -130,15 +132,17 @@ export function validateMediaCapabilities(
 
   // =========================================================================
   // OUTPUT VALIDATION
+  // Only block if capability is explicitly false (known to not support)
+  // If undefined (unknown), allow the request and let the provider reject if unsupported
   // =========================================================================
 
-  if (ctx.expectsOutput.image && !caps.imageOutput) {
+  if (ctx.expectsOutput.image && caps.imageOutput === false) {
     errors.push(`Model ${ctx.model} does not support image generation`);
   }
-  if (ctx.expectsOutput.audio && !caps.audioOutput) {
+  if (ctx.expectsOutput.audio && caps.audioOutput === false) {
     errors.push(`Model ${ctx.model} does not support audio generation`);
   }
-  if (ctx.expectsOutput.video && !caps.videoOutput) {
+  if (ctx.expectsOutput.video && caps.videoOutput === false) {
     errors.push(`Model ${ctx.model} does not support video generation`);
   }
 

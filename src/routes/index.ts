@@ -10,6 +10,7 @@ import ratelimitsRouter from "./ratelimits";
 import entitiesRouter from "./entities";
 import invitationsRouter from "./invitations";
 import providersRouter from "./providers";
+import storageRouter from "./storage";
 
 const routes = new Hono();
 
@@ -22,6 +23,7 @@ routes.route("/providers", providersRouter);
 const adminRoutes = new Hono();
 adminRoutes.use("*", firebaseAuthMiddleware);
 adminRoutes.route("/entities/:entitySlug/keys", keysRouter);
+adminRoutes.route("/entities/:entitySlug/storage", storageRouter);
 adminRoutes.route("/entities/:entitySlug/projects", projectsRouter);
 adminRoutes.route(
   "/entities/:entitySlug/projects/:projectId/endpoints",
@@ -48,4 +50,5 @@ export {
   entitiesRouter,
   invitationsRouter,
   providersRouter,
+  storageRouter,
 };

@@ -11,6 +11,7 @@ import entitiesRouter from "./entities";
 import invitationsRouter from "./invitations";
 import providersRouter from "./providers";
 import storageRouter from "./storage";
+import usersRouter from "./users";
 
 const routes = new Hono();
 
@@ -34,6 +35,7 @@ adminRoutes.route("/ratelimits/:rateLimitUserId", ratelimitsRouter);
 adminRoutes.route("/users/:userId/settings", settingsRouter);
 adminRoutes.route("/entities", entitiesRouter);
 adminRoutes.route("/invitations", invitationsRouter);
+adminRoutes.route("/users", usersRouter);
 routes.route("/", adminRoutes);
 
 export default routes;
@@ -51,4 +53,5 @@ export {
   invitationsRouter,
   providersRouter,
   storageRouter,
+  usersRouter,
 };

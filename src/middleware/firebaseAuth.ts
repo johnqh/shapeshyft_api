@@ -1,14 +1,20 @@
 /**
  * @fileoverview Firebase authentication middleware
+ *
+ * Uses @sudobility/auth_service helpers to build app-specific middleware.
  */
 
 import type { Context, Next } from "hono";
 import type { DecodedIdToken } from "firebase-admin/auth";
-import { verifyIdToken, isAnonymousUser, isSiteAdmin } from "../services/firebase";
+import { isSiteAdmin, isAnonymousUser } from "@sudobility/auth_service";
+import { verifyIdToken } from "../services/firebase";
 import { errorResponse } from "@sudobility/shapeshyft_types";
 import { eq } from "drizzle-orm";
 import { db, users } from "../db";
 
+/**
+ * Augment Hono's ContextVariableMap for type-safe context access.
+ */
 declare module "hono" {
   interface ContextVariableMap {
     firebaseUser: DecodedIdToken;
@@ -42,11 +48,13 @@ async function ensureUserExists(
 /**
  * Firebase authentication middleware.
  *
- * Verifies Firebase ID token and sets context variables:
+ * Verifies Firebase token and sets context variables:
  * - firebaseUser: The decoded Firebase token
  * - userId: The Firebase UID
  * - userEmail: The user's email (or null)
  * - siteAdmin: Whether the user is a site admin
+ *
+ * Also ensures user record exists in database (fire-and-forget).
  */
 export async function firebaseAuthMiddleware(c: Context, next: Next) {
   const authHeader = c.req.header("Authorization");
@@ -74,15 +82,16 @@ export async function firebaseAuthMiddleware(c: Context, next: Next) {
       );
     }
 
-    // Set context variables
-    c.set("firebaseUser", decodedToken);
-    c.set("userId", decodedToken.uid);
-    c.set("userEmail", decodedToken.email ?? null);
-    c.set("siteAdmin", isSiteAdmin(decodedToken.email));
+    const userId = decodedToken.uid;
+    const userEmail = decodedToken.email ?? null;
 
-    // Ensure user exists in database (for profile data)
-    // Run in background - don't block the request
-    ensureUserExists(decodedToken.uid, decodedToken.email).catch((err) =>
+    c.set("firebaseUser", decodedToken);
+    c.set("userId", userId);
+    c.set("userEmail", userEmail);
+    c.set("siteAdmin", isSiteAdmin(userEmail));
+
+    // Ensure user exists in database (fire-and-forget)
+    ensureUserExists(userId, userEmail).catch((err) =>
       console.error("Failed to ensure user exists:", err)
     );
 

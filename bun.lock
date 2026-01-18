@@ -11,7 +11,7 @@
         "@google/generative-ai": "^0.21.0",
         "@hono/zod-validator": "^0.7.5",
         "@sudobility/auth_lib": "^0.0.14",
-        "@sudobility/auth_service": "^1.0.0",
+        "@sudobility/auth_service": "^1.1.1",
         "@sudobility/entity_service": "^1.0.14",
         "@sudobility/ratelimit_service": "^1.0.17",
         "@sudobility/shapeshyft_types": "^1.0.35",
@@ -507,7 +507,7 @@
 
     "@sudobility/auth_lib": ["@sudobility/auth_lib@0.0.14", "", { "peerDependencies": { "@sudobility/di": "^1.5.21", "@sudobility/types": "^1.9.48", "@tanstack/react-query": "^5.0.0", "firebase": "^12.7.0", "react": "^19.2.3" } }, "sha512-rqiz+ri9NYIUkM1D4T+7yuckZBpxNpEPzGCrb7isTMYiqTdsPugp16ywlJ/tuIqdTa3jfSa7xKk+vcIa2iBU1A=="],
 
-    "@sudobility/auth_service": ["@sudobility/auth_service@1.0.0", "", { "peerDependencies": { "@sudobility/types": "^1.9.48", "firebase-admin": "^13.0.0", "hono": "^4.0.0" } }, "sha512-mXIpr0mRbiDJLiiFle21CR1KShmTTsDkeUOiKeTIyzXhhXC9v/c4fzdM0Uem8F5O+jR2cGSPMCTaM05lege8Bw=="],
+    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.1", "", { "peerDependencies": { "@sudobility/types": "^1.9.48", "firebase-admin": "^13.0.0" } }, "sha512-WLRoz/ml1YZvvEXPZEJpj9Xb543wvxOQViG2ZtJ/pptZT2G+ZBxBSRU2Vqtji4EM8JwqLuoL4urH7jm270FTwQ=="],
 
     "@sudobility/di": ["@sudobility/di@1.5.20", "", { "peerDependencies": { "@notifee/react-native": ">=7.0.0", "@react-native-async-storage/async-storage": ">=1.19.0", "@react-native-community/netinfo": ">=9.0.0", "@react-native-firebase/analytics": ">=18.0.0", "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/messaging": ">=18.0.0", "@react-native-firebase/remote-config": ">=18.0.0", "@sudobility/types": "^1.9.46", "firebase": ">=10.0.0", "react": ">=18.0.0", "react-native": ">=0.70.0" }, "optionalPeers": ["@notifee/react-native", "@react-native-async-storage/async-storage", "@react-native-community/netinfo", "@react-native-firebase/analytics", "@react-native-firebase/app", "@react-native-firebase/messaging", "@react-native-firebase/remote-config", "firebase", "react-native"] }, "sha512-02kwlQTYiXsjPKcsCRNuLWbk1N8EVWX0g5EHfPWydtVN/cCtKdr1aOd681BAqqN8sm6scJuTeEyb3nDU44ppjA=="],
 

@@ -8,6 +8,8 @@ import {
   llmApiKeys,
   usageAnalytics,
   entities,
+  entityMembers,
+  users,
   rateLimitCounters,
 } from "../db";
 import { rateLimitsConfig } from "../middleware/rateLimit";
@@ -34,6 +36,7 @@ import {
   EntitlementHelper,
   RateLimitChecker,
 } from "@sudobility/ratelimit_service";
+import { isSiteAdmin } from "../services/firebase";
 import { SubscriptionHelper } from "@sudobility/subscription_service";
 import { extractMediaFromInput } from "../lib/media-utils";
 import {
@@ -191,14 +194,66 @@ function getTestMode(c: any): boolean {
 }
 
 /**
+ * Check if an entity belongs to a site admin.
+ * Returns true if:
+ * 1. Entity is a personal entity
+ * 2. The owner's email is in the site admin list
+ */
+async function isEntityOwnedBySiteAdmin(
+  entity: typeof entities.$inferSelect
+): Promise<boolean> {
+  // Only check personal entities
+  if (entity.entity_type !== "personal") {
+    return false;
+  }
+
+  // Find the owner of the entity
+  const ownerMember = await db
+    .select()
+    .from(entityMembers)
+    .where(
+      and(
+        eq(entityMembers.entity_id, entity.id),
+        eq(entityMembers.role, "owner"),
+        eq(entityMembers.is_active, true)
+      )
+    )
+    .limit(1);
+
+  if (ownerMember.length === 0) {
+    return false;
+  }
+
+  // Get the owner's email from the users table
+  const ownerUser = await db
+    .select()
+    .from(users)
+    .where(eq(users.firebase_uid, ownerMember[0]!.user_id))
+    .limit(1);
+
+  if (ownerUser.length === 0 || !ownerUser[0]!.email) {
+    return false;
+  }
+
+  // Check if the owner's email is a site admin
+  return isSiteAdmin(ownerUser[0]!.email);
+}
+
+/**
  * Check and increment rate limits for an AI request.
  * Rate limits are per entity (personal or organizational).
+ * Site admin's personal entities are exempt from rate limiting.
  * Returns null if allowed, or an error response if rate limited.
  */
 async function checkRateLimit(
   c: any,
-  entityId: string
+  entity: typeof entities.$inferSelect
 ): Promise<Response | null> {
+  // Check if entity is owned by a site admin - skip rate limiting
+  if (await isEntityOwnedBySiteAdmin(entity)) {
+    return null;
+  }
+
   const testMode = getTestMode(c);
   const subHelper = getSubscriptionHelper();
   if (!subHelper) {
@@ -209,10 +264,10 @@ async function checkRateLimit(
   try {
     // Use entityId as RevenueCat subscriber ID
     // testMode is passed to filter sandbox purchases in production mode
-    const subscriptionInfo = await subHelper.getSubscriptionInfo(entityId, testMode);
+    const subscriptionInfo = await subHelper.getSubscriptionInfo(entity.id, testMode);
     const limits = getEntitlementHelper().getRateLimits(subscriptionInfo.entitlements);
     const result = await getRateLimitChecker().checkAndIncrement(
-      entityId,
+      entity.id,
       limits,
       subscriptionInfo.subscriptionStartedAt
     );
@@ -429,7 +484,7 @@ async function handlePromptRequest(c: any) {
   const { entity, endpoint, llmKey, inputData } = context;
 
   // Check rate limits using entity's subscription
-  const rateLimitResponse = await checkRateLimit(c, entity.id);
+  const rateLimitResponse = await checkRateLimit(c, entity);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }
@@ -468,7 +523,7 @@ async function handleAIRequest(c: any) {
   const { entity, endpoint, llmKey, inputData } = context;
 
   // Check rate limits using entity's subscription
-  const rateLimitResponse = await checkRateLimit(c, entity.id);
+  const rateLimitResponse = await checkRateLimit(c, entity);
   if (rateLimitResponse) {
     return rateLimitResponse;
   }

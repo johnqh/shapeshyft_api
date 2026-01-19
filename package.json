@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.62",
+  "version": "1.0.63",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -45,7 +45,7 @@
     "@sudobility/auth_service": "^1.1.1",
     "@sudobility/entity_service": "^1.0.14",
     "@sudobility/ratelimit_service": "^1.0.17",
-    "@sudobility/shapeshyft_types": "^1.0.35",
+    "@sudobility/shapeshyft_types": "^1.0.36",
     "@sudobility/subscription_service": "^1.0.1",
     "@sudobility/types": "^1.9.48",
     "drizzle-orm": "^0.45.0",

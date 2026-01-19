@@ -59,8 +59,14 @@ export const aiParamSchema = z.object({
 
 export const llmProviderSchema = z.enum([
   "openai",
-  "gemini",
   "anthropic",
+  "gemini",
+  "mistral",
+  "cohere",
+  "groq",
+  "xai",
+  "deepseek",
+  "perplexity",
   "lm_studio",
 ]);
 

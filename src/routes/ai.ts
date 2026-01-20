@@ -207,7 +207,7 @@ async function isEntityOwnedBySiteAdmin(
     return false;
   }
 
-  // Find the owner of the entity
+  // Find the owner of the personal entity
   const ownerMember = await db
     .select()
     .from(entityMembers)

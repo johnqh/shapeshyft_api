@@ -348,5 +348,183 @@ describe("AI Routes", () => {
       expect(json.success).toBe(true);
       expect(json.data.prompt).toContain("question");
     });
+
+    it("should use context override when provided in request body", async () => {
+      // Create endpoint with configured context
+      await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
+        {
+          body: {
+            endpoint_name: "context-override-endpoint",
+            display_name: "Context Override Endpoint",
+            http_method: "POST",
+            llm_key_id: keyId,
+            context: "This is the default endpoint context",
+            output_schema: {
+              type: "object",
+              properties: {
+                result: { type: "string" },
+              },
+            },
+          },
+        }
+      );
+
+      // Request with context override
+      const res = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/ai/${entitySlug}/${projectName}/context-override-endpoint/prompt?api_key=${projectApiKey}`,
+        {
+          body: {
+            data: "some input",
+            context: "This is the OVERRIDE context from request",
+          },
+        }
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      // Should contain the override context, not the default
+      expect(json.data.prompt).toContain("OVERRIDE context from request");
+      expect(json.data.prompt).not.toContain("default endpoint context");
+    });
+
+    it("should use endpoint context when no context override provided", async () => {
+      // Create endpoint with configured context
+      await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
+        {
+          body: {
+            endpoint_name: "no-override-endpoint",
+            display_name: "No Override Endpoint",
+            http_method: "POST",
+            llm_key_id: keyId,
+            context: "This is the configured endpoint context",
+            output_schema: {
+              type: "object",
+              properties: {
+                result: { type: "string" },
+              },
+            },
+          },
+        }
+      );
+
+      // Request without context field
+      const res = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/ai/${entitySlug}/${projectName}/no-override-endpoint/prompt?api_key=${projectApiKey}`,
+        {
+          body: {
+            data: "some input",
+          },
+        }
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      // Should contain the endpoint's configured context
+      expect(json.data.prompt).toContain("configured endpoint context");
+    });
+
+    it("should not include context field in the input data of prompt", async () => {
+      // Create endpoint
+      await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
+        {
+          body: {
+            endpoint_name: "context-stripped-endpoint",
+            display_name: "Context Stripped Endpoint",
+            http_method: "POST",
+            llm_key_id: keyId,
+            output_schema: {
+              type: "object",
+              properties: {
+                result: { type: "string" },
+              },
+            },
+          },
+        }
+      );
+
+      // Request with context and other data
+      const res = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/ai/${entitySlug}/${projectName}/context-stripped-endpoint/prompt?api_key=${projectApiKey}`,
+        {
+          body: {
+            userInput: "This should appear in prompt",
+            context: "This context should NOT appear as input data",
+          },
+        }
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      // The prompt should contain userInput
+      expect(json.data.prompt).toContain("userInput");
+      expect(json.data.prompt).toContain("This should appear in prompt");
+      // The context field should be used as context, not appear as "context:" input field
+      // Note: The context value itself may appear, but not as a key "context" in the input
+    });
+
+    it("should ignore empty context override", async () => {
+      // Create endpoint with configured context
+      await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/entities/${entitySlug}/projects/${projectId}/endpoints`,
+        {
+          body: {
+            endpoint_name: "empty-context-endpoint",
+            display_name: "Empty Context Endpoint",
+            http_method: "POST",
+            llm_key_id: keyId,
+            context: "This is the default context",
+            output_schema: {
+              type: "object",
+              properties: {
+                result: { type: "string" },
+              },
+            },
+          },
+        }
+      );
+
+      // Request with empty context string
+      const res = await createTestRequest(
+        app,
+        "POST",
+        `/api/v1/ai/${entitySlug}/${projectName}/empty-context-endpoint/prompt?api_key=${projectApiKey}`,
+        {
+          body: {
+            data: "some input",
+            context: "   ", // Empty/whitespace-only
+          },
+        }
+      );
+
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      // Should fall back to default context when override is empty
+      expect(json.data.prompt).toContain("default context");
+    });
   });
 });

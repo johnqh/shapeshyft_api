@@ -130,6 +130,39 @@ function isIpAllowed(clientIp: string | null, allowlist: string[] | null): boole
 }
 
 // =============================================================================
+// Input Processing Helpers
+// =============================================================================
+
+/**
+ * Extract and remove the "context" field from input data.
+ * If present, this context overrides the endpoint's configured context.
+ * @returns The extracted context (or undefined) and the cleaned input without the context field
+ */
+function extractContextOverride(inputData: unknown): {
+  contextOverride: string | undefined;
+  cleanedInput: unknown;
+} {
+  if (
+    typeof inputData !== "object" ||
+    inputData === null ||
+    Array.isArray(inputData)
+  ) {
+    return { contextOverride: undefined, cleanedInput: inputData };
+  }
+
+  const input = inputData as Record<string, unknown>;
+  const { context, ...rest } = input;
+
+  // Only use context if it's a non-empty string
+  const contextOverride =
+    typeof context === "string" && context.trim().length > 0
+      ? context
+      : undefined;
+
+  return { contextOverride, cleanedInput: rest };
+}
+
+// =============================================================================
 // Shared Validation Logic
 // =============================================================================
 
@@ -476,12 +509,12 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
  * Handle prompt generation request - returns just the prompt without calling LLM
  */
 async function handlePromptRequest(c: any) {
-  const context = await validateAndGetContext(c);
-  if (!context.success) {
-    return context.response;
+  const validationResult = await validateAndGetContext(c);
+  if (!validationResult.success) {
+    return validationResult.response;
   }
 
-  const { entity, endpoint, llmKey, inputData } = context;
+  const { entity, endpoint, llmKey, inputData } = validationResult;
 
   // Check rate limits using entity's subscription
   const rateLimitResponse = await checkRateLimit(c, entity);
@@ -489,12 +522,16 @@ async function handlePromptRequest(c: any) {
     return rateLimitResponse;
   }
 
+  // Extract context override from input (if provided)
+  const { contextOverride, cleanedInput } = extractContextOverride(inputData);
+
   // Generate the combined prompt using ApiHelper
+  // Use context override if provided, otherwise use endpoint's configured context
   const prompt = ApiHelper.prompt({
-    inputData,
+    inputData: cleanedInput,
     outputSchema: endpoint.output_schema as JsonSchema | null,
     instructions: endpoint.instructions,
-    context: endpoint.context,
+    context: contextOverride ?? endpoint.context,
     provider: llmKey.provider,
   });
 
@@ -515,12 +552,12 @@ async function handlePromptRequest(c: any) {
 async function handleAIRequest(c: any) {
   const startTime = Date.now();
 
-  const context = await validateAndGetContext(c);
-  if (!context.success) {
-    return context.response;
+  const validationResult = await validateAndGetContext(c);
+  if (!validationResult.success) {
+    return validationResult.response;
   }
 
-  const { entity, endpoint, llmKey, inputData } = context;
+  const { entity, endpoint, llmKey, inputData } = validationResult;
 
   // Check rate limits using entity's subscription
   const rateLimitResponse = await checkRateLimit(c, entity);
@@ -528,9 +565,13 @@ async function handleAIRequest(c: any) {
     return rateLimitResponse;
   }
 
-  // Extract media from input data
+  // Extract context override from input (if provided)
+  const { contextOverride, cleanedInput: inputWithoutContext } =
+    extractContextOverride(inputData);
+
+  // Extract media from input data (after removing context field)
   const extractionResult = extractMediaFromInput(
-    inputData as Record<string, unknown>
+    inputWithoutContext as Record<string, unknown>
   );
   if (extractionResult.error) {
     return c.json(errorResponse(extractionResult.error), 400);
@@ -567,11 +608,12 @@ async function handleAIRequest(c: any) {
 
   // Build the prompts for LLM call (providers expect system/user format)
   // Use cleaned input (media replaced with placeholders)
+  // Use context override if provided, otherwise use endpoint's configured context
   const prompts = ApiHelper.buildLegacyPrompts({
     inputData: cleanedInput,
     outputSchema: endpoint.output_schema as JsonSchema | null,
     instructions: endpoint.instructions,
-    context: endpoint.context,
+    context: contextOverride ?? endpoint.context,
     provider: llmKey.provider,
   });
 

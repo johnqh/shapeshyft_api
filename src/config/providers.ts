@@ -3,6 +3,58 @@
  *
  * This configuration is served via API endpoints so it can be updated
  * without requiring frontend package updates.
+ *
+ * ## Supported Providers
+ * - **openai**: OpenAI GPT models (GPT-4, GPT-4o, o1, o3)
+ * - **anthropic**: Anthropic Claude models (Claude 4, Claude 4.5)
+ * - **gemini**: Google Gemini models (Gemini 2.x, Imagen, Veo)
+ * - **mistral**: Mistral AI models (Mistral Large, Pixtral)
+ * - **cohere**: Cohere Command models
+ * - **groq**: Groq-hosted models (Llama, Whisper)
+ * - **xai**: xAI Grok models
+ * - **deepseek**: DeepSeek Chat and Reasoner
+ * - **perplexity**: Perplexity Sonar models with web search
+ * - **lm_studio**: Local LLM server (LM Studio or any OpenAI-compatible endpoint)
+ *
+ * ## LM Studio Model Identifiers
+ *
+ * LM Studio uses the OpenAI-compatible API format. When specifying models:
+ *
+ * - **API requests** use just the model name (e.g., `"qwen2.5-vl-7b-instruct"`)
+ * - **Downloading models** uses publisher/name format (e.g., `lmstudio-community/Qwen2.5-VL-7B-Instruct-GGUF`)
+ *
+ * The model identifier in API requests matches what's returned by `GET /v1/models`.
+ * Example response:
+ * ```json
+ * { "id": "qwen2.5-vl-7b-instruct", "object": "model" }
+ * ```
+ *
+ * To discover available models on a running LM Studio server:
+ * ```bash
+ * curl http://localhost:1234/v1/models
+ * ```
+ *
+ * For multi-variant models, you can specify quantization with `@`:
+ * ```
+ * google/gemma-3-12b@q3_k_l
+ * google/gemma-3-12b@4bit
+ * ```
+ *
+ * ## Vision Models
+ *
+ * Vision-capable models can process images in addition to text:
+ * - Qwen2.5-VL series: Excellent object recognition, 128k context window
+ * - Gemma 3 series: Google's multimodal models
+ * - GLM-4V: Optimized for local deployment
+ * - Pixtral: Mistral's vision model
+ * - olmOCR: Specialized for OCR tasks
+ * - Janus-Pro: Visual QA and scene interpretation
+ *
+ * Note: Vision models are not optimal for text-only tasks. For text-only
+ * workloads, use dedicated text models like Qwen3 or Mistral.
+ *
+ * @see https://lmstudio.ai/docs/developer/openai-compat
+ * @see https://lmstudio.ai/docs/developer/openai-compat/models
  */
 
 import type {
@@ -94,7 +146,7 @@ export const PROVIDERS: ProviderConfig[] = [
     name: "LM Studio / Custom",
     description: "Local LLM server or custom OpenAI-compatible endpoint",
     allowsCustomModel: true,
-    defaultModel: "qwen/qwen3-8b",
+    defaultModel: "qwen3-8b",
     requiresEndpointUrl: true,
   },
 ];
@@ -153,15 +205,49 @@ export const PROVIDER_MODELS: Record<LlmProvider, string[]> = {
     "sonar-reasoning", "sonar-reasoning-pro",
     "sonar-deep-research",
   ],
+  /**
+   * LM Studio Model Identifiers
+   *
+   * IMPORTANT: LM Studio API uses just the model name as the identifier, NOT the
+   * full publisher/model path used for downloading models.
+   *
+   * - Download format: `lmstudio-community/Qwen2.5-VL-7B-Instruct-GGUF`
+   * - API request format: `qwen2.5-vl-7b-instruct`
+   *
+   * These identifiers match what's returned by `GET /v1/models` on your LM Studio server.
+   * If you have different models loaded, you can use `allowsCustomModel: true` to enter
+   * any model name, or query your server directly: `curl http://localhost:1234/v1/models`
+   *
+   * Multi-model loading: LM Studio supports loading multiple models simultaneously
+   * (since v0.2.17). You can have both text and vision models loaded at once.
+   */
   lm_studio: [
-    // Text models (trending on LM Studio January 2026)
-    "openai/gpt-oss-20b", "openai/gpt-oss-120b", "deepseek/deepseek-r1-0528-qwen3-8b",
-    "qwen/qwen3-8b", "qwen/qwen3-14b", "qwen/qwen3-30b-a3b-2507", "qwen/qwen3-4b-2507",
-    "qwen/qwen3-4b-thinking-2507", "qwen/qwen3-coder-30b", "qwen/qwen2.5-coder-14b",
-    "mistralai/mistral-7b-instruct-v0.3", "mistralai/ministral-3-14b-reasoning", "mistralai/magistral-small-2509",
-    // Vision models
-    "google/gemma-3-4b", "google/gemma-3-12b", "google/gemma-3-27b", "google/gemma-3n-e4b",
-    "qwen/qwen3-vl-4b", "qwen/qwen3-vl-8b", "qwen/qwen3-vl-30b",
+    // -------------------------------------------------------------------------
+    // Text Models - Use for text-only tasks (faster, lower memory)
+    // -------------------------------------------------------------------------
+    "qwen3-8b", // Qwen3 8B - excellent general purpose
+    "qwen3-14b", // Qwen3 14B - better reasoning
+    "qwen3-30b-a3b", // Qwen3 30B MoE (3B active) - efficiency sweet spot
+    "qwen2.5-coder-14b-instruct", // Code-specialized
+    "mistral-7b-instruct-v0.3", // Fast, good for simple tasks
+    "deepseek-r1-distill-qwen-7b", // Reasoning-focused
+    // -------------------------------------------------------------------------
+    // Vision Models - Process images + text (higher memory, slower)
+    // -------------------------------------------------------------------------
+    // Google Gemma 3 - state-of-the-art multimodal from Google
+    "gemma-3-4b-it", // Lightweight vision
+    "gemma-3-12b-it", // Balanced
+    "gemma-3-27b-it", // Best quality
+    // Qwen2.5-VL - excellent object recognition, 128k context window
+    "qwen2.5-vl-3b-instruct", // Lightweight
+    "qwen2.5-vl-7b-instruct", // Recommended for most use cases
+    "qwen2.5-vl-32b-instruct", // High quality
+    "qwen2.5-vl-72b-instruct", // Best quality (requires significant VRAM)
+    // Other vision models
+    "glm-4v-9b", // GLM-4V - optimized for local deployment
+    "pixtral-12b-2409", // Mistral's vision model
+    "olmocr-2-7b-1025", // olmOCR 2 - specialized for OCR (Oct 2025)
+    "janus-pro-7b", // DeepSeek Janus-Pro - visual QA, scene interpretation
   ],
 };
 
@@ -404,53 +490,72 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
   "sonar-deep-research": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
 
   // ===========================================================================
-  // LM Studio / Local Models
+  // LM Studio / Local Models (API uses just model name as identifier)
   // ===========================================================================
   // Text-only models
-  "deepseek/deepseek-r1-0528-qwen3-8b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "qwen/qwen3-8b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "qwen/qwen3-14b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "qwen/qwen3-30b-a3b-2507": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "qwen/qwen3-4b-2507": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "qwen/qwen3-4b-thinking-2507": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "qwen/qwen3-coder-30b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "qwen/qwen2.5-coder-14b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "mistralai/mistral-7b-instruct-v0.3": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "mistralai/ministral-3-14b-reasoning": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
-  "mistralai/magistral-small-2509": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
+  "qwen3-8b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
+  "qwen3-14b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
+  "qwen3-30b-a3b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
+  "qwen2.5-coder-14b-instruct": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
+  "mistral-7b-instruct-v0.3": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
+  "deepseek-r1-distill-qwen-7b": { visionInput: false, audioInput: false, videoInput: false, imageOutput: false, audioOutput: false, videoOutput: false },
   // Vision models - Google Gemma 3
-  "google/gemma-3-4b": {
+  "gemma-3-4b-it": {
     visionInput: true, audioInput: false, videoInput: false,
     imageOutput: false, audioOutput: false, videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  "google/gemma-3-12b": {
+  "gemma-3-12b-it": {
     visionInput: true, audioInput: false, videoInput: false,
     imageOutput: false, audioOutput: false, videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  "google/gemma-3-27b": {
+  "gemma-3-27b-it": {
     visionInput: true, audioInput: false, videoInput: false,
     imageOutput: false, audioOutput: false, videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  "google/gemma-3n-e4b": {
+  // Vision models - Qwen2.5-VL (excellent object recognition, 128k context)
+  "qwen2.5-vl-3b-instruct": {
     visionInput: true, audioInput: false, videoInput: false,
     imageOutput: false, audioOutput: false, videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  // Vision models - Qwen3-VL
-  "qwen/qwen3-vl-4b": {
+  "qwen2.5-vl-7b-instruct": {
     visionInput: true, audioInput: false, videoInput: false,
     imageOutput: false, audioOutput: false, videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  "qwen/qwen3-vl-8b": {
+  "qwen2.5-vl-32b-instruct": {
     visionInput: true, audioInput: false, videoInput: false,
     imageOutput: false, audioOutput: false, videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  "qwen/qwen3-vl-30b": {
+  "qwen2.5-vl-72b-instruct": {
+    visionInput: true, audioInput: false, videoInput: false,
+    imageOutput: false, audioOutput: false, videoOutput: false,
+    mediaFormats: { imageFormats: ["base64"] },
+  },
+  // Vision models - GLM-4V (optimized for local deployment)
+  "glm-4v-9b": {
+    visionInput: true, audioInput: false, videoInput: false,
+    imageOutput: false, audioOutput: false, videoOutput: false,
+    mediaFormats: { imageFormats: ["base64"] },
+  },
+  // Vision models - Pixtral (Mistral's vision model)
+  "pixtral-12b-2409": {
+    visionInput: true, audioInput: false, videoInput: false,
+    imageOutput: false, audioOutput: false, videoOutput: false,
+    mediaFormats: { imageFormats: ["base64"] },
+  },
+  // Vision models - olmOCR 2 (specialized for OCR)
+  "olmocr-2-7b-1025": {
+    visionInput: true, audioInput: false, videoInput: false,
+    imageOutput: false, audioOutput: false, videoOutput: false,
+    mediaFormats: { imageFormats: ["base64"] },
+  },
+  // Vision models - DeepSeek Janus-Pro (visual QA, scene interpretation)
+  "janus-pro-7b": {
     visionInput: true, audioInput: false, videoInput: false,
     imageOutput: false, audioOutput: false, videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
@@ -540,25 +645,24 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   "sonar-reasoning-pro": { input: 800, output: 800 },
   "sonar-deep-research": { input: 1200, output: 1200 },
 
-  // LM Studio (notional pricing)
-  "deepseek/deepseek-r1-0528-qwen3-8b": { input: 20, output: 40 },
-  "qwen/qwen3-8b": { input: 20, output: 40 },
-  "qwen/qwen3-14b": { input: 30, output: 60 },
-  "qwen/qwen3-30b-a3b-2507": { input: 50, output: 100 },
-  "qwen/qwen3-4b-2507": { input: 10, output: 20 },
-  "qwen/qwen3-4b-thinking-2507": { input: 10, output: 20 },
-  "qwen/qwen3-coder-30b": { input: 50, output: 100 },
-  "qwen/qwen2.5-coder-14b": { input: 30, output: 60 },
-  "mistralai/mistral-7b-instruct-v0.3": { input: 15, output: 30 },
-  "mistralai/ministral-3-14b-reasoning": { input: 30, output: 60 },
-  "mistralai/magistral-small-2509": { input: 30, output: 60 },
-  "google/gemma-3-4b": { input: 15, output: 30 },
-  "google/gemma-3-12b": { input: 30, output: 60 },
-  "google/gemma-3-27b": { input: 50, output: 100 },
-  "google/gemma-3n-e4b": { input: 15, output: 30 },
-  "qwen/qwen3-vl-4b": { input: 15, output: 30 },
-  "qwen/qwen3-vl-8b": { input: 25, output: 50 },
-  "qwen/qwen3-vl-30b": { input: 50, output: 100 },
+  // LM Studio (notional pricing - local models are free, pricing for cost tracking)
+  "qwen3-8b": { input: 0, output: 0 },
+  "qwen3-14b": { input: 0, output: 0 },
+  "qwen3-30b-a3b": { input: 0, output: 0 },
+  "qwen2.5-coder-14b-instruct": { input: 0, output: 0 },
+  "mistral-7b-instruct-v0.3": { input: 0, output: 0 },
+  "deepseek-r1-distill-qwen-7b": { input: 0, output: 0 },
+  "gemma-3-4b-it": { input: 0, output: 0 },
+  "gemma-3-12b-it": { input: 0, output: 0 },
+  "gemma-3-27b-it": { input: 0, output: 0 },
+  "qwen2.5-vl-3b-instruct": { input: 0, output: 0 },
+  "qwen2.5-vl-7b-instruct": { input: 0, output: 0 },
+  "qwen2.5-vl-32b-instruct": { input: 0, output: 0 },
+  "qwen2.5-vl-72b-instruct": { input: 0, output: 0 },
+  "glm-4v-9b": { input: 0, output: 0 },
+  "pixtral-12b-2409": { input: 0, output: 0 },
+  "olmocr-2-7b-1025": { input: 0, output: 0 },
+  "janus-pro-7b": { input: 0, output: 0 },
 };
 
 // Default pricing for unknown models

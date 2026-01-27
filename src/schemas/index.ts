@@ -138,13 +138,13 @@ export const projectCreateSchema = z.object({
       "Must be lowercase alphanumeric with optional hyphens"
     ),
   display_name: z.string().min(1).max(255),
-  description: z.string().max(1000).optional(),
+  description: z.string().max(1000).nullish(),
 });
 
 export const projectUpdateSchema = z.object({
   project_name: z.string().min(1).max(255).regex(projectNameRegex).optional(),
   display_name: z.string().min(1).max(255).optional(),
-  description: z.string().max(1000).optional(),
+  description: z.string().max(1000).nullish(),
   is_active: z.boolean().optional(),
 });
 
@@ -190,15 +190,15 @@ export const endpointCreateSchema = z.object({
   display_name: z.string().min(1).max(255),
   http_method: httpMethodSchema.optional().default("POST"),
   llm_key_id: z.string().uuid(),
-  model: z.string().max(255).optional(),
-  input_schema: jsonSchemaSchema.optional(),
-  output_schema: jsonSchemaSchema.optional(),
-  instructions: z.string().max(10000).optional(),
-  context: z.string().max(10000).optional(),
+  model: z.string().max(255).nullish(),
+  input_schema: jsonSchemaSchema.nullish(),
+  output_schema: jsonSchemaSchema.nullish(),
+  instructions: z.string().max(10000).nullish(),
+  context: z.string().max(10000).nullish(),
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
   // For Whisper endpoints: model to use for structured extraction
-  transcription_extraction_model: z.string().max(255).nullable().optional(),
+  transcription_extraction_model: z.string().max(255).nullish(),
 });
 
 export const endpointUpdateSchema = z.object({
@@ -206,17 +206,17 @@ export const endpointUpdateSchema = z.object({
   display_name: z.string().min(1).max(255).optional(),
   http_method: httpMethodSchema.optional(),
   llm_key_id: z.string().uuid().optional(),
-  model: z.string().max(255).nullable().optional(),
-  input_schema: jsonSchemaSchema.nullable().optional(),
-  output_schema: jsonSchemaSchema.nullable().optional(),
-  instructions: z.string().max(10000).nullable().optional(),
-  context: z.string().max(10000).nullable().optional(),
+  model: z.string().max(255).nullish(),
+  input_schema: jsonSchemaSchema.nullish(),
+  output_schema: jsonSchemaSchema.nullish(),
+  instructions: z.string().max(10000).nullish(),
+  context: z.string().max(10000).nullish(),
   is_active: z.boolean().optional(),
   ip_allowlist: ipAllowlistSchema,
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
   // For Whisper endpoints: model to use for structured extraction
-  transcription_extraction_model: z.string().max(255).nullable().optional(),
+  transcription_extraction_model: z.string().max(255).nullish(),
 });
 
 // =============================================================================

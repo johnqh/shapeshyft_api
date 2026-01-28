@@ -6,7 +6,7 @@ import type { MediaContent, MediaType } from "@sudobility/shapeshyft_types";
 import {
   DATA_URL_REGEX,
   PROVIDER_URL_REGEX,
-  ALLOWED_MIME_TYPES,
+  ACCEPTED_MIME_TYPES,
   SIZE_LIMITS,
   inferMimeFromUrl,
   inferMediaTypeFromMime,
@@ -54,8 +54,8 @@ export function parseDataUrl(
   const mediaCategory = match[2] as MediaType;
   const data = match[3];
 
-  // Validate MIME type is in allowlist
-  if (!ALLOWED_MIME_TYPES[mediaCategory]?.includes(mimeType)) {
+  // Validate MIME type is in allowlist (includes convertible types)
+  if (!ACCEPTED_MIME_TYPES[mediaCategory]?.includes(mimeType)) {
     return { error: `Unsupported MIME type: ${mimeType}` };
   }
 

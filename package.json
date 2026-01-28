@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.72",
+  "version": "1.0.73",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -21,15 +21,16 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "vitest": "^4.0.4",
     "@types/node": "^24.10.1",
+    "@types/sharp": "^0.32.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9.39.2",
     "eslint-plugin-import": "^2.32.0",
     "prettier": "^3.7.4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.4"
   },
   "overrides": {
     "esbuild": "0.25.12"
@@ -53,6 +54,7 @@
     "hono": "^4.10.7",
     "openai": "^4.77.0",
     "postgres": "^3.4.7",
+    "sharp": "^0.34.5",
     "zod": "^3.24.0"
   }
 }

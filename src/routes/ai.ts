@@ -39,6 +39,7 @@ import {
 import { isSiteAdmin } from "../services/firebase";
 import { SubscriptionHelper } from "@sudobility/subscription_service";
 import { extractMediaFromInput } from "../lib/media-utils";
+import { convertAllMediaIfNeeded } from "../lib/media-conversion";
 import {
   validateMediaCapabilities,
   validateWhisperRequest,
@@ -576,7 +577,21 @@ async function handleAIRequest(c: any) {
   if (extractionResult.error) {
     return c.json(errorResponse(extractionResult.error), 400);
   }
-  const { cleanedInput, media } = extractionResult.result!;
+  const { cleanedInput, media: extractedMedia } = extractionResult.result!;
+
+  // Convert unsupported image formats (SVG, TIFF, etc.) to PNG
+  let media = extractedMedia;
+  if (extractedMedia.length > 0) {
+    try {
+      media = await convertAllMediaIfNeeded(extractedMedia);
+    } catch (conversionError) {
+      const errorMessage =
+        conversionError instanceof Error
+          ? conversionError.message
+          : "Failed to convert image format";
+      return c.json(errorResponse(errorMessage), 400);
+    }
+  }
 
   // Determine model (from endpoint config)
   const model = endpoint.model ?? undefined;

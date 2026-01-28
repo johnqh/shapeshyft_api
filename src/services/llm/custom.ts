@@ -195,12 +195,36 @@ export class CustomLLMProvider implements ILLMProvider {
   }
 
   buildApiPayload(request: LLMRequest): Record<string, unknown> {
-    // Build OpenAI-compatible payload
-    const messages: { role: string; content: string }[] = [];
+    // Build OpenAI-compatible payload with multimodal support
+    const messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [];
+
     if (request.systemPrompt) {
       messages.push({ role: "system", content: request.systemPrompt });
     }
-    messages.push({ role: "user", content: request.prompt });
+
+    // Build user message content (multimodal if images present)
+    if (request.media?.length) {
+      const userContent: Array<Record<string, unknown>> = [];
+
+      for (const m of request.media) {
+        if (m.type === "image") {
+          userContent.push({
+            type: "image_url",
+            image_url: {
+              url:
+                m.format === "base64"
+                  ? `data:${m.mimeType};base64,${m.data}`
+                  : m.data,
+            },
+          });
+        }
+      }
+
+      userContent.push({ type: "text", text: request.prompt });
+      messages.push({ role: "user", content: userContent });
+    } else {
+      messages.push({ role: "user", content: request.prompt });
+    }
 
     // Use simple payload for custom LLM servers - rely on system prompt for JSON formatting
     // Many servers don't support response_format or tools

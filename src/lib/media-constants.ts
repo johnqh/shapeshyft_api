@@ -9,7 +9,7 @@ import type { MediaType, LlmProvider } from "@sudobility/shapeshyft_types";
 // MIME Type Allowlists
 // =============================================================================
 
-/** Allowed MIME types per media type */
+/** Allowed MIME types per media type (directly supported by LLMs) */
 export const ALLOWED_MIME_TYPES: Record<MediaType, readonly string[]> = {
   image: ["image/jpeg", "image/png", "image/gif", "image/webp"],
   audio: [
@@ -21,6 +21,27 @@ export const ALLOWED_MIME_TYPES: Record<MediaType, readonly string[]> = {
     "audio/m4a",
   ],
   video: ["video/mp4", "video/webm", "video/quicktime"],
+} as const;
+
+/** MIME types that can be converted to supported formats */
+export const CONVERTIBLE_MIME_TYPES: Record<MediaType, readonly string[]> = {
+  image: [
+    "image/svg+xml",
+    "image/tiff",
+    "image/bmp",
+    "image/heic",
+    "image/heif",
+    "image/avif",
+  ],
+  audio: [],
+  video: [],
+} as const;
+
+/** All accepted MIME types (allowed + convertible) */
+export const ACCEPTED_MIME_TYPES: Record<MediaType, readonly string[]> = {
+  image: [...ALLOWED_MIME_TYPES.image, ...CONVERTIBLE_MIME_TYPES.image],
+  audio: [...ALLOWED_MIME_TYPES.audio, ...CONVERTIBLE_MIME_TYPES.audio],
+  video: [...ALLOWED_MIME_TYPES.video, ...CONVERTIBLE_MIME_TYPES.video],
 } as const;
 
 // =============================================================================

@@ -228,20 +228,14 @@ function getTestMode(c: any): boolean {
 }
 
 /**
- * Check if an entity belongs to a site admin.
- * Returns true if:
- * 1. Entity is a personal entity
- * 2. The owner's email is in the site admin list
+ * Check if an entity is owned by a site admin.
+ * Entities owned by site admins are exempt from rate limiting.
+ * This applies to both personal and organization entities.
  */
 async function isEntityOwnedBySiteAdmin(
   entity: typeof entities.$inferSelect
 ): Promise<boolean> {
-  // Only check personal entities
-  if (entity.entity_type !== "personal") {
-    return false;
-  }
-
-  // Find the owner of the personal entity
+  // Find the owner of the entity
   const ownerMember = await db
     .select()
     .from(entityMembers)
@@ -276,7 +270,7 @@ async function isEntityOwnedBySiteAdmin(
 /**
  * Check and increment rate limits for an AI request.
  * Rate limits are per entity (personal or organizational).
- * Site admin's personal entities are exempt from rate limiting.
+ * Entities owned by site admins are exempt from rate limiting.
  * Returns null if allowed, or an error response if rate limited.
  */
 async function checkRateLimit(

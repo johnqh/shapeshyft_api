@@ -6,6 +6,7 @@ Backend API server for ShapeShyft - an LLM structured output platform.
 
 - **Language**: TypeScript
 - **Runtime**: Bun
+- **Package Manager**: Bun (do not use npm/yarn/pnpm for installing dependencies)
 - **Framework**: Hono (fast web framework)
 - **Database**: PostgreSQL with Drizzle ORM
 - **Auth**: Firebase Admin SDK

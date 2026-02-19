@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import { db, entities, entityMembers, entityInvitations, users } from "../db";
 import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
+import { sendInvitationEmail } from "../services/email";
 
 // Create entity helpers with shapeshyft schema
 const config: InvitationHelperConfig = {
@@ -309,6 +310,14 @@ entitiesRouter.post("/:entitySlug/invitations", async (c) => {
       email,
       role,
     });
+
+    // Send invite email (non-blocking)
+    sendInvitationEmail({
+      recipientEmail: email,
+      entityName: entity.displayName,
+      inviteToken: invitation.token,
+    }).catch((err) => console.error("Failed to send invitation email:", err));
+
     return c.json({ success: true, data: invitation }, 201);
   } catch (error: any) {
     console.error("Error creating invitation:", error);
@@ -338,6 +347,14 @@ entitiesRouter.put("/:entitySlug/invitations/:invitationId", async (c) => {
     }
 
     const renewed = await helpers.invitations.renewInvitation(invitationId);
+
+    // Resend invite email (non-blocking)
+    sendInvitationEmail({
+      recipientEmail: renewed.email,
+      entityName: entity.displayName,
+      inviteToken: renewed.token,
+    }).catch((err) => console.error("Failed to resend invitation email:", err));
+
     return c.json({ success: true, data: renewed });
   } catch (error: any) {
     console.error("Error renewing invitation:", error);

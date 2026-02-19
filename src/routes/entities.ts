@@ -315,7 +315,6 @@ entitiesRouter.post("/:entitySlug/invitations", async (c) => {
     sendInvitationEmail({
       recipientEmail: email,
       entityName: entity.displayName,
-      inviteToken: invitation.token,
     }).catch((err) => console.error("Failed to send invitation email:", err));
 
     return c.json({ success: true, data: invitation }, 201);
@@ -352,7 +351,6 @@ entitiesRouter.put("/:entitySlug/invitations/:invitationId", async (c) => {
     sendInvitationEmail({
       recipientEmail: renewed.email,
       entityName: entity.displayName,
-      inviteToken: renewed.token,
     }).catch((err) => console.error("Failed to resend invitation email:", err));
 
     return c.json({ success: true, data: renewed });

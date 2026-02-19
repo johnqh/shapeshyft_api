@@ -21,13 +21,11 @@ if (apiKey) {
 interface InvitationEmailParams {
   recipientEmail: string;
   entityName: string;
-  inviteToken: string;
 }
 
 export async function sendInvitationEmail({
   recipientEmail,
   entityName,
-  inviteToken,
 }: InvitationEmailParams): Promise<void> {
   if (!resend) {
     console.warn("Skipping invitation email — Resend not configured");

@@ -170,3 +170,61 @@ app.post('/projects', zValidator('json', createProjectSchema), async (c) => {
   // ...
 });
 ```
+
+## Workspace Context
+
+This project is part of the **ShapeShyft** multi-project workspace at the parent directory. See `../CLAUDE.md` for the full architecture, dependency graph, and build order.
+
+## Downstream Impact
+
+This is a **leaf application** -- no other project depends on it.
+
+When upstream libraries change, update here:
+
+| Upstream Library | Update command |
+|-----------------|----------------|
+| `@sudobility/auth_service` | `bun update @sudobility/auth_service && bun run typecheck` |
+| `@sudobility/entity_service` | `bun update @sudobility/entity_service && bun run typecheck` |
+| `@sudobility/ratelimit_service` | `bun update @sudobility/ratelimit_service && bun run typecheck` |
+| `@sudobility/subscription_service` | `bun update @sudobility/subscription_service && bun run typecheck` |
+| `@sudobility/shapeshyft_types` | `bun update @sudobility/shapeshyft_types && bun run typecheck` |
+
+## Local Dev Workflow
+
+To test with local library versions:
+
+```bash
+# In the library (e.g., auth_service):
+cd ../auth_service && bun link
+
+# In this project:
+bun link @sudobility/auth_service
+
+# Run dev server:
+bun run dev
+
+# When done, unlink:
+bun unlink @sudobility/auth_service && bun install
+```
+
+## Pre-Commit Checklist
+
+No `verify` script. Run checks manually:
+
+```bash
+bun run typecheck && bun run lint && bun test
+```
+
+For integration tests (requires test database):
+```bash
+bun run test:setup && bun run test:integration
+```
+
+## Gotchas
+
+- **No build step needed for dev** -- `bun run dev` runs TypeScript directly. `bun run build` is only for production Docker images.
+- **Database must be running** -- requires PostgreSQL. Check `DATABASE_URL` in `.env.local`.
+- **`ENCRYPTION_KEY` must be 64-character hex** -- LLM API keys are encrypted at rest. Missing this causes runtime errors.
+- **Unit tests vs integration tests** -- `bun test` runs only `tests/unit/`. `bun run test:integration` needs a real database.
+- **Tables live in `shapeshyft` PostgreSQL schema** -- not the default `public` schema.
+- **Five `@sudobility/*` dependencies** -- version mismatches between them are the most common cause of type errors.

@@ -10,12 +10,12 @@
         "@google-cloud/storage": "^7.18.0",
         "@google/generative-ai": "^0.21.0",
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/auth_service": "^1.1.7",
-        "@sudobility/entity_service": "^1.0.23",
-        "@sudobility/ratelimit_service": "^1.0.24",
-        "@sudobility/shapeshyft_types": "^1.0.42",
-        "@sudobility/subscription_service": "^1.0.5",
-        "@sudobility/types": "^1.9.53",
+        "@sudobility/auth_service": "^1.1.8",
+        "@sudobility/entity_service": "^1.0.24",
+        "@sudobility/ratelimit_service": "^1.0.25",
+        "@sudobility/shapeshyft_types": "^1.0.43",
+        "@sudobility/subscription_service": "^1.0.6",
+        "@sudobility/types": "^1.9.54",
         "drizzle-orm": "^0.45.0",
         "firebase-admin": "^13.6.0",
         "groq-sdk": "^0.37.0",
@@ -491,17 +491,17 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.7", "", { "peerDependencies": { "@sudobility/types": "^1.9.53", "firebase-admin": "^13.0.0" } }, "sha512-bXZRyD2NbD6Xijlu6V9o9yNBxK0Jkrnhf9SMadpIhE4rYsqRPv+GC8Qr5k8xfGSzzvM7GA1LMQfT0YohFFpxWw=="],
+    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.8", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "firebase-admin": "^13.0.0" } }, "sha512-0qnOmHTNfsbMebSDzzf3D3IZdQ6NqiH0PiqXbmOgPNqexxGZHvDYHcWWjxdWP2MaGDm5s81DKdM+ry2CPvBltw=="],
 
-    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.23", "", { "peerDependencies": { "@sudobility/types": "^1.9.53", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-UtUAFvNEmj0GZfVYVHWoQOPxCYIGHxfeJncRSUdqFQnCPX8PotMQIO7T5Uoe8WnT0m+C00wt742iCYnxjE18Bg=="],
+    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.24", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-WuSjKK1GkmjeHAPEoNdCNiZq93ZY1bfdJYEyJoG51CRLEy0sT3LwPKq4Hf1Zox4M7oHFt3saS4eRVnbdZePxWw=="],
 
-    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.24", "", { "peerDependencies": { "@sudobility/types": "^1.9.53", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-VHYD1XHu7O2CbklFIm7ZuzJUVd3C/mBWSphK89alosFOuOfRaOHotmUwyFUF/u//P0VDoAKBW7w4jaIOn6n9nA=="],
+    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.25", "", { "peerDependencies": { "@sudobility/types": "^1.9.54", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-l1LjdHENl+8yZhDqJ+V8cOdyGO4isnuJm3M3rSWbBop5aO2fg2Wq+0nBxtUCMy+a4X1kLZdgikwjDjXymowdsg=="],
 
-    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.42", "", { "peerDependencies": { "@sudobility/types": "^1.9.53" } }, "sha512-IeVhHhxjOdELRR0Yd8o7p/1OagyjribyDEC0GFUGEXDwfJaDz5/oBtM2OVih5IsNAMZ3rWXZ8Kz+9FNnYVEKIw=="],
+    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.43", "", { "peerDependencies": { "@sudobility/types": "^1.9.54" } }, "sha512-1eRqFmkEv1ISj+w+0JT3P+7g2+QC7QWQ4pEHyFA7rkxZNlz5r3jqIFszu7nGc6ljyJ1EUKlESrc2GPV4nIzbvg=="],
 
-    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.5", "", { "peerDependencies": { "@sudobility/types": "^1.9.53" } }, "sha512-f6SdHL4YthOEzeuGqkzazeJVq//emdTQsz/Xib0Jf5czgYdDIy17SzSngfiF+l0Ly67z9QQaLAe3nKrmjFHUig=="],
+    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.6", "", { "peerDependencies": { "@sudobility/types": "^1.9.54" } }, "sha512-1rjw1QimbAh1/9MmHtAf9IqD6B0KvvQfWAFrDAcxvnmmLCvQjdqfVdJeY5aZFwd/+sfWjPZg3Psizz973yPLHA=="],
 
-    "@sudobility/types": ["@sudobility/types@1.9.53", "", {}, "sha512-h86H+thP+Fm4pZKR0ggSR0Ne1vRbUOmusXJI+IRGtj0MmYtIuWtqcDN++kJJ2K6QFNa+/gs84mvbsgbJ+D491A=="],
+    "@sudobility/types": ["@sudobility/types@1.9.54", "", {}, "sha512-A2Kxr639D8NqPbudeARhp1cbKlE6YBf7NKaU8Gh1XwajgV9sqTBMEB+IfFpifU/tKg1JFEj/t5qmPPK4VzdZaw=="],
 
     "@tootallnate/once": ["@tootallnate/once@2.0.0", "", {}, "sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A=="],
 

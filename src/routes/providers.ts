@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Public provider catalog routes
+ * @description Serves the LLM provider and model catalog. These are public
+ * routes (no auth required) so the frontend can fetch provider/model info
+ * without requiring server-side package updates.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";

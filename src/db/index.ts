@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Database connection and initialization
+ * @description Provides a lazy Proxy-based database connection that only
+ * connects on first access. Also handles table creation and migrations
+ * via initDatabase().
+ */
+
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres, { type Sql } from "postgres";
 import * as schema from "./schema";

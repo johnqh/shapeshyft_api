@@ -1,3 +1,11 @@
+/**
+ * @fileoverview OpenAI LLM provider
+ * @description Implements the ILLMProvider interface for OpenAI models.
+ * Also used by Mistral, xAI, DeepSeek, Perplexity, and Cohere
+ * (OpenAI-compatible APIs). Supports function calling for structured output,
+ * multimodal input (images, audio), and audio output generation.
+ */
+
 import OpenAI from "openai";
 import type { GeneratedMedia } from "@sudobility/shapeshyft_types";
 import {

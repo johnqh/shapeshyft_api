@@ -1,3 +1,10 @@
+/**
+ * @fileoverview LLM provider factory and exports
+ * @description Creates the appropriate LLM provider instance based on provider type.
+ * OpenAI-compatible providers (Mistral, xAI, DeepSeek, Perplexity, Cohere) reuse
+ * the OpenAIProvider class. Groq has a dedicated provider for Whisper transcription.
+ */
+
 import type { LlmProvider } from "@sudobility/shapeshyft_types";
 import type { ILLMProvider, ProviderConfig } from "./types";
 import { OpenAIProvider } from "./openai";

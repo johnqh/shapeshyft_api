@@ -672,18 +672,40 @@ export const DEFAULT_MODEL_PRICING: ModelPricing = { input: 100, output: 300 };
 // Helper Functions
 // =============================================================================
 
+/**
+ * Get provider configuration by ID.
+ * @param providerId - The provider identifier (e.g., "openai", "anthropic")
+ * @returns The provider config or undefined if not found
+ */
 export function getProviderById(providerId: LlmProvider): ProviderConfig | undefined {
   return PROVIDERS.find(p => p.id === providerId);
 }
 
+/**
+ * Get the list of model IDs for a given provider.
+ * @param providerId - The provider identifier
+ * @returns Array of model ID strings
+ */
 export function getModelsForProvider(providerId: LlmProvider): string[] {
   return PROVIDER_MODELS[providerId] ?? [];
 }
 
+/**
+ * Get capabilities for a specific model (vision, audio, video I/O).
+ * Returns empty object for unknown models (permissive by default).
+ * @param model - The model identifier
+ * @returns Model capabilities
+ */
 export function getModelCapabilities(model: string): ModelCapabilities {
   return MODEL_CAPABILITIES[model] ?? {};
 }
 
+/**
+ * Get pricing for a specific model (cents per 1M tokens).
+ * Returns DEFAULT_MODEL_PRICING for unknown models.
+ * @param model - The model identifier
+ * @returns Model pricing
+ */
 export function getModelPricing(model: string): ModelPricing {
   return MODEL_PRICING[model] ?? DEFAULT_MODEL_PRICING;
 }

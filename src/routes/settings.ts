@@ -1,3 +1,9 @@
+/**
+ * @fileoverview User settings routes
+ * @description Manages per-user settings including organization name and path.
+ * Uses upsert pattern -- settings are created on first PUT if they don't exist.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";

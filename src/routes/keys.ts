@@ -1,3 +1,9 @@
+/**
+ * @fileoverview LLM API key management routes
+ * @description CRUD operations for encrypted LLM provider API keys.
+ * Encrypted data is never returned to the client (uses toSafeKey).
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Rate limit configuration and usage history routes
+ * @description Provides rate limit config (tiers, current usage) and
+ * usage history per entity. Rate limits are tied to RevenueCat subscriptions.
+ */
+
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import {

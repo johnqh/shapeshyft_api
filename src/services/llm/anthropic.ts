@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Anthropic LLM provider
+ * @description Implements the ILLMProvider interface for Anthropic Claude models.
+ * Uses tool_use for structured output extraction. Supports image input
+ * via base64 and URL formats.
+ */
+
 import Anthropic from "@anthropic-ai/sdk";
 import type {
   ILLMProvider,

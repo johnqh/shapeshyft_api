@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Project management routes
+ * @description CRUD operations for projects. Each project gets an auto-generated
+ * API key on creation. Includes API key retrieval and refresh endpoints.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";

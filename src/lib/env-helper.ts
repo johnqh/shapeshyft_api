@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Environment variable helper with .env.local priority
+ * @description Reads environment variables with .env.local file taking
+ * priority over process.env. The .env.local file is parsed once and cached.
+ */
+
 import { readFileSync } from "fs";
 import { join } from "path";
 

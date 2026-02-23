@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Zod validation schemas for all API routes
+ * @description Defines parameter, body, and query schemas used by
+ * route handlers via @hono/zod-validator.
+ */
+
 import { z } from "zod";
 
 // =============================================================================

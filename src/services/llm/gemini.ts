@@ -1,3 +1,11 @@
+/**
+ * @fileoverview Google Gemini LLM provider
+ * @description Implements the ILLMProvider interface for Gemini models.
+ * Uses native responseSchema for structured JSON output. Supports multimodal
+ * input (images, audio, video) via base64 and GCS URLs. Includes stubs
+ * for Imagen image generation and Veo video generation (requires Vertex AI SDK).
+ */
+
 import {
   GoogleGenerativeAI,
   type GenerationConfig,

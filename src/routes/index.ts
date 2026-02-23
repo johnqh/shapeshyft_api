@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Route aggregator
+ * @description Registers all API routes under /api/v1.
+ * Public routes (ai, providers) are registered before admin routes
+ * to avoid wildcard middleware interception.
+ */
+
 import { Hono } from "hono";
 import { firebaseAuthMiddleware } from "../middleware/firebaseAuth";
 import keysRouter from "./keys";

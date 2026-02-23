@@ -1,3 +1,9 @@
+/**
+ * @fileoverview ShapeShyft API entry point
+ * @description Hono app setup with CORS, logging, health check, and route mounting.
+ * Initializes the database on startup and exports the Bun server configuration.
+ */
+
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";

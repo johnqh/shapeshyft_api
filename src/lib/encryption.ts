@@ -1,3 +1,9 @@
+/**
+ * @fileoverview AES-256-CBC encryption utilities
+ * @description Encrypts and decrypts API keys and storage credentials at rest.
+ * Uses a 32-byte encryption key from the ENCRYPTION_KEY environment variable.
+ */
+
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { getRequiredEnv } from "./env-helper";
 

@@ -1,3 +1,10 @@
+/**
+ * @fileoverview API helper for prompt generation and LLM request construction
+ * @description Provides the ApiHelper object with methods for generating
+ * human-readable prompts, constructing provider-specific API payloads,
+ * and building legacy system/user prompt pairs for LLM calls.
+ */
+
 import type {
   LlmProvider,
   PromptInput,

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Analytics routes
+ * @description Provides aggregated usage analytics per entity with
+ * optional date, project, and endpoint filters.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and, gte, lte, sql } from "drizzle-orm";

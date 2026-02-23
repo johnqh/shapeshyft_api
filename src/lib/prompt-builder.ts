@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Schema-to-prompt conversion and provider-specific prompt building
+ * @description Converts JSON Schema definitions into human-readable prompt instructions,
+ * generates example output, and builds provider-optimized system/user prompts.
+ */
+
 import type { JsonSchema, LlmProvider } from "@sudobility/shapeshyft_types";
 
 /**

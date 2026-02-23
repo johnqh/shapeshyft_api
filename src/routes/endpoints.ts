@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Endpoint CRUD routes
+ * @description Manages AI endpoint configurations within projects.
+ * Endpoints define the LLM key, model, input/output schemas, and instructions.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";

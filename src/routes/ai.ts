@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Public AI inference routes
+ * @description Handles AI endpoint invocation and prompt generation.
+ * These routes use project API key authentication (not Firebase),
+ * with optional IP allowlisting and rate limiting per entity.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";

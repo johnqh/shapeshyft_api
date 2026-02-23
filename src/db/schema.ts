@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Drizzle ORM schema definitions
+ * @description Defines all database tables in the `shapeshyft` PostgreSQL schema.
+ * Includes entity tables from @sudobility/entity_service and rate limit
+ * counters from @sudobility/ratelimit_service.
+ */
+
 import {
   pgSchema,
   pgEnum,

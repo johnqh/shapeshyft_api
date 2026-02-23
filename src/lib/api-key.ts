@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Project API key management
+ * @description Generates, encrypts, decrypts, and validates project API keys.
+ * Keys use the format `sk_live_<base64url-random>` and are validated
+ * using timing-safe comparison to prevent timing attacks.
+ */
+
 import { randomBytes, timingSafeEqual } from "crypto";
 import { encryptApiKey, decryptApiKey } from "./encryption";
 

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Entity cloud storage configuration routes
+ * @description Manages GCS/S3 storage configs for entities. Credentials
+ * are encrypted at rest using AES-256-CBC. Supports create, update, and delete.
+ */
+
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";

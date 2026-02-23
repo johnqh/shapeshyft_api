@@ -1,3 +1,9 @@
+/**
+ * @fileoverview LLM provider type definitions
+ * @description Core types for the LLM provider system including request/response
+ * types, the provider interface, and cost estimation re-exports.
+ */
+
 import type {
   JsonSchema,
   LlmProvider,

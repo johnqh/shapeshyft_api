@@ -15,7 +15,7 @@ import {
   type LlmApiKeySafe,
 } from "@sudobility/shapeshyft_types";
 import { encryptApiKey } from "../lib/encryption";
-import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
+import { createEntityHelpers, type InvitationHelperConfig, type Entity } from "@sudobility/entity_service";
 
 const keysRouter = new Hono();
 
@@ -37,7 +37,7 @@ async function getEntityWithPermission(
   entitySlug: string,
   userId: string,
   requireEdit = false
-): Promise<{ entity: typeof entities.$inferSelect; error?: string } | { entity?: undefined; error: string }> {
+): Promise<{ entity: Entity; error?: never } | { entity?: never; error: string }> {
   const entity = await helpers.entity.getEntityBySlug(entitySlug);
   if (!entity) {
     return { error: "Entity not found" };
@@ -85,7 +85,7 @@ keysRouter.get(
       const { entitySlug } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 
@@ -112,7 +112,7 @@ keysRouter.get(
       const { entitySlug, keyId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 
@@ -145,7 +145,7 @@ keysRouter.post(
       const body = c.req.valid("json");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 
@@ -191,7 +191,7 @@ keysRouter.put(
       const body = c.req.valid("json");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 
@@ -250,7 +250,7 @@ keysRouter.delete(
       const { entitySlug, keyId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 

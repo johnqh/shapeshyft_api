@@ -15,7 +15,7 @@ import {
   projectIdParamSchema,
 } from "../schemas";
 import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
-import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
+import { createEntityHelpers, type InvitationHelperConfig, type Entity } from "@sudobility/entity_service";
 
 const endpointsRouter = new Hono();
 
@@ -37,7 +37,7 @@ async function getEntityWithPermission(
   entitySlug: string,
   userId: string,
   requireEdit = false
-): Promise<{ entity: typeof entities.$inferSelect; error?: string } | { entity?: undefined; error: string }> {
+): Promise<{ entity: Entity; error?: never } | { entity?: never; error: string }> {
   const entity = await helpers.entity.getEntityBySlug(entitySlug);
   if (!entity) {
     return { error: "Entity not found" };
@@ -92,7 +92,7 @@ endpointsRouter.get(
       const { entitySlug, projectId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 
@@ -124,7 +124,7 @@ endpointsRouter.get(
       const { entitySlug, projectId, endpointId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 
@@ -164,7 +164,7 @@ endpointsRouter.post(
       const body = c.req.valid("json");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 
@@ -238,7 +238,7 @@ endpointsRouter.put(
       const body = c.req.valid("json");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 
@@ -344,7 +344,7 @@ endpointsRouter.delete(
       const { entitySlug, projectId, endpointId } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
       }
 

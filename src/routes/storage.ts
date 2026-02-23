@@ -29,6 +29,7 @@ import { encryptApiKey } from "../lib/encryption";
 import {
   createEntityHelpers,
   type InvitationHelperConfig,
+  type Entity,
 } from "@sudobility/entity_service";
 
 const storageRouter = new Hono();
@@ -52,8 +53,8 @@ async function getEntityWithPermission(
   userId: string,
   requireEdit = false
 ): Promise<
-  | { entity: typeof entities.$inferSelect; error?: string }
-  | { entity?: undefined; error: string }
+  | { entity: Entity; error?: never }
+  | { entity?: never; error: string }
 > {
   const entity = await helpers.entity.getEntityBySlug(entitySlug);
   if (!entity) {
@@ -105,7 +106,7 @@ storageRouter.get(
       const { entitySlug } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
           result.error === "Entity not found" ? 404 : 403
@@ -144,7 +145,7 @@ storageRouter.post(
       const body = c.req.valid("json");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
           result.error === "Entity not found" ? 404 : 403
@@ -218,7 +219,7 @@ storageRouter.put(
       const body = c.req.valid("json");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
           result.error === "Entity not found" ? 404 : 403
@@ -284,7 +285,7 @@ storageRouter.delete(
       const { entitySlug } = c.req.valid("param");
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error) {
+      if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
           result.error === "Entity not found" ? 404 : 403

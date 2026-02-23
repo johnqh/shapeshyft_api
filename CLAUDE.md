@@ -63,6 +63,7 @@ src/
     ├── api-helper.ts       # ApiHelper with prompt(), request(), buildLegacyPrompts()
     ├── api-key.ts           # Project API key generation, encryption, timing-safe validation
     ├── encryption.ts        # AES-256-CBC encrypt/decrypt for API keys
+    ├── entity-helpers.ts    # Shared entity helpers singleton + getEntityWithPermission()
     ├── env-helper.ts        # .env.local priority env var helper with caching
     ├── prompt-builder.ts    # Schema-to-prompt conversion, provider-specific prompt configs
     ├── storage-utils.ts     # GCS/S3 upload with signed URLs, credential decryption
@@ -79,7 +80,11 @@ tests/
 ├── setup.ts                # Test database setup
 ├── unit/
 │   ├── api-key.test.ts     # Unit: API key generation/validation
+│   ├── capability-validator.test.ts # Unit: Model capability validation
 │   ├── encryption.test.ts  # Unit: AES-256-CBC encryption
+│   ├── media-constants.test.ts # Unit: MIME types, size limits, regex
+│   ├── media-conversion.test.ts # Unit: Image format conversion
+│   ├── media-utils.test.ts # Unit: Media extraction from input data
 │   └── prompt-builder.test.ts # Unit: Schema-to-prompt conversion
 └── utils/
     ├── index.ts            # Test utility exports
@@ -320,10 +325,8 @@ bun unlink @sudobility/auth_service && bun install
 
 ## Pre-Commit Checklist
 
-No `verify` script. Run checks manually:
-
 ```bash
-bun run typecheck && bun run lint && bun test
+bun run verify  # Runs: typecheck + lint + unit tests
 ```
 
 For integration tests (requires test database):
@@ -349,6 +352,6 @@ bun run test:setup && bun run test:integration
 - **Media conversion only for images** -- SVG, TIFF, HEIC, BMP, AVIF are converted to PNG via Sharp. Audio/video conversion is not supported.
 - **SSRF prevention** -- only `gs://` URLs are allowed for media input. HTTP/HTTPS URLs are rejected to prevent server-side request forgery.
 - **Rate limits are per-entity** -- tied to RevenueCat subscription via entity slug mapping, not per individual user.
-- **`getEntityWithPermission()` is duplicated** -- this helper appears in multiple route files (keys, endpoints, projects, storage). Consider extracting to shared utility.
+- **`getEntityWithPermission()` is centralized** -- lives in `src/lib/entity-helpers.ts` along with the singleton `entityHelpers` instance. All route files import from there.
 - **Signed URLs expire in 7 days** -- GCS and S3 uploads generate signed URLs with 7-day expiry. Clients must handle expired URLs.
 - **Firebase token verifier uses 5-minute cache** -- reduces Firebase Admin calls but means revoked tokens remain valid for up to 5 minutes.

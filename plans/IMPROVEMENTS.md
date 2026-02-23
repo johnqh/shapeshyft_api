@@ -4,37 +4,23 @@ Prioritized improvement suggestions for the ShapeShyft API codebase.
 
 ## Priority 1: Code Quality and DRY
 
-### 1.1 Extract Shared `getEntityWithPermission()` Helper
+### 1.1 Extract Shared `getEntityWithPermission()` Helper ✅
 
 **Files affected**: `src/routes/keys.ts`, `src/routes/endpoints.ts`, `src/routes/projects.ts`, `src/routes/storage.ts`
 
-The `getEntityWithPermission()` function is duplicated across 4 route files with near-identical implementations. Extract to a shared utility module (e.g., `src/lib/entity-helpers.ts`) that all routes can import.
+The `getEntityWithPermission()` function was duplicated across 4 route files. Extracted to `src/lib/entity-helpers.ts` with a shared `EntityPermissionResult` type and `getPermissionErrorStatus()` helper.
 
-```typescript
-// src/lib/entity-helpers.ts
-export async function getEntityWithPermission(
-  entitySlug: string,
-  userId: string,
-  requireEdit?: boolean
-): Promise<EntityPermissionResult> { ... }
-```
-
-### 1.2 Extract Shared Entity Helper Configuration
+### 1.2 Extract Shared Entity Helper Configuration ✅
 
 **Files affected**: `src/routes/keys.ts`, `src/routes/endpoints.ts`, `src/routes/projects.ts`, `src/routes/storage.ts`, `src/routes/entities.ts`, `src/routes/invitations.ts`
 
-The `InvitationHelperConfig` and `createEntityHelpers()` setup is duplicated in 6 route files. Create a shared singleton:
+The `InvitationHelperConfig` and `createEntityHelpers()` setup was duplicated in 6 route files. Extracted to `src/lib/entity-helpers.ts` as a singleton `entityHelpers` export.
 
-```typescript
-// src/lib/entity-config.ts
-export const entityHelpers = createEntityHelpers(config);
-```
-
-### 1.3 Consolidate Error Response Patterns
+### 1.3 Consolidate Error Response Patterns ✅
 
 **Files affected**: All route files
 
-Some routes return `{ success: false, error: ... }` directly while others use `errorResponse()` from `@sudobility/shapeshyft_types`. Standardize on `errorResponse()` everywhere.
+Standardized all routes to use `errorResponse()` / `successResponse()` from `@sudobility/shapeshyft_types`. The `entities.ts` and `invitations.ts` routes previously used raw `{ success: false, error: ... }` objects.
 
 ## Priority 2: Security Improvements
 
@@ -44,17 +30,17 @@ Some routes return `{ success: false, error: ... }` directly while others use `e
 
 The `/providers` routes are public with no rate limiting. While they only serve static data, they could be abused for DoS. Add basic IP-based rate limiting.
 
-### 2.2 Validate Entity Membership in Analytics
+### 2.2 Validate Entity Membership in Analytics ✅
 
-**Files affected**: `src/routes/analytics.ts`
+**Files affected**: `src/routes/analytics.ts`, `src/routes/ratelimits.ts`
 
-The `getEntityIdForAnalytics` function checks `entityMembers` but does not filter by `is_active`. An inactive member could still access analytics.
+The `getEntityIdForAnalytics` and `getEntityIdForRateLimits` functions now filter by `is_active` when checking entity membership. Inactive members can no longer access analytics or rate limit data.
 
-### 2.3 Add Request Body Size Limits
+### 2.3 Add Request Body Size Limits ✅
 
 **Files affected**: `src/index.ts`
 
-No explicit request body size limit is configured. Large payloads (especially with base64 media) could cause memory issues. Add Hono body limit middleware.
+Added Hono `bodyLimit` middleware with a 50MB limit to accommodate base64-encoded media payloads while preventing abuse from excessively large requests. Returns HTTP 413 with a descriptive error message.
 
 ## Priority 3: Architecture Improvements
 
@@ -84,17 +70,21 @@ For long-running requests (especially with Whisper + extraction), add webhook ca
 
 ## Priority 4: Testing
 
-### 4.1 Add Unit Tests for Media Utilities
+### 4.1 Add Unit Tests for Media Utilities ✅
 
 **Files affected**: `tests/unit/` (new files)
 
-`media-utils.ts`, `media-conversion.ts`, `media-constants.ts`, and `capability-validator.ts` have no unit tests. These are pure functions ideal for unit testing.
+Added comprehensive unit tests for all media utility modules:
+- `tests/unit/media-constants.test.ts` -- MIME type allowlists, size limits, regex patterns, validation helpers, provider audio formats
+- `tests/unit/media-utils.test.ts` -- Data URL parsing, provider URL parsing, SSRF prevention, media extraction from input
+- `tests/unit/media-conversion.test.ts` -- Format detection, conversion triggers, passthrough for supported formats
+- `tests/unit/capability-validator.test.ts` -- Whisper validation, generative model detection, capability checks, provider-specific validation
 
-### 4.2 Add Unit Tests for Prompt Builder Provider Configs
+### 4.2 Add Unit Tests for Prompt Builder Provider Configs ✅
 
 **Files affected**: `tests/unit/prompt-builder.test.ts`
 
-The existing test file may not cover the provider-specific prompt configurations (`getProviderPromptConfig`, `buildSystemPromptForProvider`, `buildPromptsForProvider`).
+The existing test file already covers `getProviderPromptConfig`, `buildSystemPromptForProvider`, and `buildPromptsForProvider` with tests for all providers, provider-specific configurations, and additional instructions.
 
 ### 4.3 Add Integration Tests for Entity Routes
 
@@ -110,11 +100,11 @@ No integration tests exist for entity, invitation, storage, ratelimit, settings,
 
 The PostgreSQL connection is created with default settings. Configure connection pool size, idle timeout, and max lifetime for production workloads.
 
-### 5.2 Cache Provider/Model Catalog
+### 5.2 Cache Provider/Model Catalog ✅
 
 **Files affected**: `src/routes/providers.ts`
 
-The provider catalog is static data served on every request. Add cache headers (`Cache-Control`) to reduce redundant requests from the frontend.
+Added `Cache-Control: public, max-age=3600, s-maxage=3600` headers to all three provider routes (`GET /providers`, `GET /providers/:provider`, `GET /providers/:provider/models`). The 1-hour TTL reduces redundant requests from the frontend while ensuring model catalog updates propagate within a reasonable time.
 
 ### 5.3 Optimize Analytics Queries
 
@@ -139,11 +129,17 @@ Generate OpenAPI spec from Zod schemas and route definitions. Hono has `@hono/zo
 
 Replace `console.error` calls with a structured logger (e.g., pino) that includes request IDs, timestamps, and context for production debugging.
 
-### 6.3 Add Health Check with Database Connectivity
+### 6.3 Add Health Check with Database Connectivity ✅
 
 **Files affected**: `src/index.ts`
 
-The current health check always returns `"healthy"`. Add a `/health/ready` endpoint that verifies database connectivity and returns appropriate status codes for load balancer health checks.
+Added `/health/ready` endpoint that executes a `SELECT 1` query against the database. Returns HTTP 200 with `{ status: "ready", database: "connected" }` on success, or HTTP 503 with error details on failure. The existing `/health` endpoint remains as a lightweight liveness probe.
+
+### 6.4 Add Verify Script ✅
+
+**Files affected**: `package.json`
+
+Added `bun run verify` script that runs `typecheck + lint + unit tests` in sequence. Documented in CLAUDE.md under Pre-Commit Checklist.
 
 ## Priority 7: Observability
 

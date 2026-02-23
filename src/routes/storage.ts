@@ -9,11 +9,7 @@ import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
 import {
   db,
-  entities,
-  entityMembers,
   entityStorageConfigs,
-  entityInvitations,
-  users,
 } from "../db";
 import {
   storageConfigCreateSchema,
@@ -26,58 +22,9 @@ import {
   type EntityStorageConfig,
 } from "@sudobility/shapeshyft_types";
 import { encryptApiKey } from "../lib/encryption";
-import {
-  createEntityHelpers,
-  type InvitationHelperConfig,
-  type Entity,
-} from "@sudobility/entity_service";
+import { getEntityWithPermission, getPermissionErrorStatus } from "../lib/entity-helpers";
 
 const storageRouter = new Hono();
-
-// Create entity helpers
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
-
-/**
- * Helper to get entity by slug and verify user membership
- */
-async function getEntityWithPermission(
-  entitySlug: string,
-  userId: string,
-  requireEdit = false
-): Promise<
-  | { entity: Entity; error?: never }
-  | { entity?: never; error: string }
-> {
-  const entity = await helpers.entity.getEntityBySlug(entitySlug);
-  if (!entity) {
-    return { error: "Entity not found" };
-  }
-
-  if (requireEdit) {
-    const canEdit = await helpers.permissions.canCreateProjects(
-      entity.id,
-      userId
-    );
-    if (!canEdit) {
-      return { error: "Insufficient permissions" };
-    }
-  } else {
-    const canView = await helpers.permissions.canViewEntity(entity.id, userId);
-    if (!canView) {
-      return { error: "Access denied" };
-    }
-  }
-
-  return { entity };
-}
 
 /**
  * Convert database storage config to safe response (no credentials)
@@ -109,7 +56,7 @@ storageRouter.get(
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
-          result.error === "Entity not found" ? 404 : 403
+          getPermissionErrorStatus(result.errorCode)
         );
       }
 
@@ -148,7 +95,7 @@ storageRouter.post(
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
-          result.error === "Entity not found" ? 404 : 403
+          getPermissionErrorStatus(result.errorCode)
         );
       }
 
@@ -222,7 +169,7 @@ storageRouter.put(
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
-          result.error === "Entity not found" ? 404 : 403
+          getPermissionErrorStatus(result.errorCode)
         );
       }
 
@@ -288,7 +235,7 @@ storageRouter.delete(
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
-          result.error === "Entity not found" ? 404 : 403
+          getPermissionErrorStatus(result.errorCode)
         );
       }
 

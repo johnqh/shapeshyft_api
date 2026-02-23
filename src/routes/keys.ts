@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
-import { db, entities, entityMembers, llmApiKeys, entityInvitations, users } from "../db";
+import { db, llmApiKeys } from "../db";
 import { keyCreateSchema, keyUpdateSchema, keyIdParamSchema, entitySlugParamSchema } from "../schemas";
 import {
   successResponse,
@@ -15,48 +15,9 @@ import {
   type LlmApiKeySafe,
 } from "@sudobility/shapeshyft_types";
 import { encryptApiKey } from "../lib/encryption";
-import { createEntityHelpers, type InvitationHelperConfig, type Entity } from "@sudobility/entity_service";
+import { getEntityWithPermission, getPermissionErrorStatus } from "../lib/entity-helpers";
 
 const keysRouter = new Hono();
-
-// Create entity helpers
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
-
-/**
- * Helper to get entity by slug and verify user membership
- */
-async function getEntityWithPermission(
-  entitySlug: string,
-  userId: string,
-  requireEdit = false
-): Promise<{ entity: Entity; error?: never } | { entity?: never; error: string }> {
-  const entity = await helpers.entity.getEntityBySlug(entitySlug);
-  if (!entity) {
-    return { error: "Entity not found" };
-  }
-
-  if (requireEdit) {
-    const canEdit = await helpers.permissions.canCreateProjects(entity.id, userId);
-    if (!canEdit) {
-      return { error: "Insufficient permissions" };
-    }
-  } else {
-    const canView = await helpers.permissions.canViewEntity(entity.id, userId);
-    if (!canView) {
-      return { error: "Access denied" };
-    }
-  }
-
-  return { entity };
-}
 
 /**
  * Convert database key to safe response (no encrypted data)
@@ -86,7 +47,7 @@ keysRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const rows = await db
@@ -113,7 +74,7 @@ keysRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const rows = await db
@@ -146,7 +107,7 @@ keysRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       // Encrypt API key if provided
@@ -192,7 +153,7 @@ keysRouter.put(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       // Check if key exists and belongs to entity
@@ -251,7 +212,7 @@ keysRouter.delete(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const rows = await db

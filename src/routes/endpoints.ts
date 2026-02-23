@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
-import { db, entities, entityMembers, projects, endpoints, llmApiKeys, entityInvitations, users } from "../db";
+import { db, projects, endpoints, llmApiKeys } from "../db";
 import {
   endpointCreateSchema,
   endpointUpdateSchema,
@@ -15,48 +15,9 @@ import {
   projectIdParamSchema,
 } from "../schemas";
 import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
-import { createEntityHelpers, type InvitationHelperConfig, type Entity } from "@sudobility/entity_service";
+import { getEntityWithPermission, getPermissionErrorStatus } from "../lib/entity-helpers";
 
 const endpointsRouter = new Hono();
-
-// Create entity helpers
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
-
-/**
- * Helper to get entity by slug and verify user membership
- */
-async function getEntityWithPermission(
-  entitySlug: string,
-  userId: string,
-  requireEdit = false
-): Promise<{ entity: Entity; error?: never } | { entity?: never; error: string }> {
-  const entity = await helpers.entity.getEntityBySlug(entitySlug);
-  if (!entity) {
-    return { error: "Entity not found" };
-  }
-
-  if (requireEdit) {
-    const canEdit = await helpers.permissions.canCreateProjects(entity.id, userId);
-    if (!canEdit) {
-      return { error: "Insufficient permissions" };
-    }
-  } else {
-    const canView = await helpers.permissions.canViewEntity(entity.id, userId);
-    if (!canView) {
-      return { error: "Access denied" };
-    }
-  }
-
-  return { entity };
-}
 
 /**
  * Helper to verify project belongs to entity
@@ -93,7 +54,7 @@ endpointsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);
@@ -125,7 +86,7 @@ endpointsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);
@@ -165,7 +126,7 @@ endpointsRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);
@@ -239,7 +200,7 @@ endpointsRouter.put(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);
@@ -345,7 +306,7 @@ endpointsRouter.delete(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), result.error === "Entity not found" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);

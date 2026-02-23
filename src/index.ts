@@ -7,16 +7,26 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { initDatabase } from "./db";
+import { bodyLimit } from "hono/body-limit";
+import { initDatabase, db } from "./db";
 import routes from "./routes";
-import { successResponse } from "@sudobility/shapeshyft_types";
+import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
 import { getEnv } from "./lib/env-helper";
+import { sql } from "drizzle-orm";
 
 const app = new Hono();
 
 // Middleware
 app.use("*", logger());
 app.use("*", cors());
+
+// Body size limit: 50MB to accommodate base64-encoded media payloads
+app.use("*", bodyLimit({
+  maxSize: 50 * 1024 * 1024, // 50 MB
+  onError: (c) => {
+    return c.json(errorResponse("Request body too large. Maximum size is 50MB."), 413);
+  },
+}));
 
 // Health check
 app.get("/", c => {
@@ -29,13 +39,33 @@ app.get("/", c => {
   );
 });
 
-// Health endpoint (public, no auth)
+// Health endpoint (public, no auth) - basic liveness check
 app.get("/health", c => {
   return c.json(
     successResponse({
       status: "healthy",
     })
   );
+});
+
+// Readiness endpoint (public, no auth) - verifies database connectivity
+app.get("/health/ready", async c => {
+  try {
+    const result = await db.execute(sql`SELECT 1 as ok`);
+    if (result.length > 0) {
+      return c.json(
+        successResponse({
+          status: "ready",
+          database: "connected",
+        })
+      );
+    }
+    return c.json(errorResponse("Database check returned no rows"), 503);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Health check failed:", message);
+    return c.json(errorResponse(`Database not ready: ${message}`), 503);
+  }
 });
 
 // API routes

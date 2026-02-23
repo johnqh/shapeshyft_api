@@ -4,20 +4,9 @@
  */
 
 import { Hono } from "hono";
-import { db, entities, entityMembers, entityInvitations, users } from "../db";
-import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
+import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
+import { entityHelpers as helpers } from "../lib/entity-helpers";
 import { sendInvitationEmail } from "../services/email";
-
-// Create entity helpers with shapeshyft schema
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
 
 type Variables = {
   userId: string; // This is the firebase_uid directly
@@ -42,10 +31,10 @@ entitiesRouter.get("/", async (c) => {
       userId,
       userEmail ?? undefined
     );
-    return c.json({ success: true, data: userEntities });
+    return c.json(successResponse(userEntities));
   } catch (error: any) {
     console.error("Error listing entities:", error);
-    return c.json({ success: false, error: error.message }, 500);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
 });
 
@@ -59,7 +48,7 @@ entitiesRouter.post("/", async (c) => {
   const { displayName, entitySlug, description } = body;
 
   if (!displayName) {
-    return c.json({ success: false, error: "displayName is required" }, 400);
+    return c.json(errorResponse("displayName is required"), 400);
   }
 
   try {
@@ -68,10 +57,10 @@ entitiesRouter.post("/", async (c) => {
       entitySlug,
       description,
     });
-    return c.json({ success: true, data: entity }, 201);
+    return c.json(successResponse(entity), 201);
   } catch (error: any) {
     console.error("Error creating entity:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 
@@ -85,20 +74,20 @@ entitiesRouter.get("/:entitySlug", async (c) => {
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user is a member
     const isMember = await helpers.members.isMember(entity.id, userId);
     if (!isMember) {
-      return c.json({ success: false, error: "Access denied" }, 403);
+      return c.json(errorResponse("Access denied"), 403);
     }
 
     const role = await helpers.members.getUserRole(entity.id, userId);
-    return c.json({ success: true, data: { ...entity, userRole: role } });
+    return c.json(successResponse({ ...entity, userRole: role }));
   } catch (error: any) {
     console.error("Error getting entity:", error);
-    return c.json({ success: false, error: error.message }, 500);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
 });
 
@@ -113,20 +102,20 @@ entitiesRouter.put("/:entitySlug", async (c) => {
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can edit
     const canEdit = await helpers.permissions.canEditEntity(entity.id, userId);
     if (!canEdit) {
-      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+      return c.json(errorResponse("Insufficient permissions"), 403);
     }
 
     const updated = await helpers.entity.updateEntity(entity.id, body);
-    return c.json({ success: true, data: updated });
+    return c.json(successResponse(updated));
   } catch (error: any) {
     console.error("Error updating entity:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 
@@ -140,20 +129,20 @@ entitiesRouter.delete("/:entitySlug", async (c) => {
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can delete
     const canDelete = await helpers.permissions.canDeleteEntity(entity.id, userId);
     if (!canDelete) {
-      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+      return c.json(errorResponse("Insufficient permissions"), 403);
     }
 
     await helpers.entity.deleteEntity(entity.id);
-    return c.json({ success: true });
+    return c.json(successResponse(null));
   } catch (error: any) {
     console.error("Error deleting entity:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 
@@ -171,20 +160,20 @@ entitiesRouter.get("/:entitySlug/members", async (c) => {
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can view
     const canView = await helpers.permissions.canViewEntity(entity.id, userId);
     if (!canView) {
-      return c.json({ success: false, error: "Access denied" }, 403);
+      return c.json(errorResponse("Access denied"), 403);
     }
 
     const members = await helpers.members.getMembers(entity.id);
-    return c.json({ success: true, data: members });
+    return c.json(successResponse(members));
   } catch (error: any) {
     console.error("Error listing members:", error);
-    return c.json({ success: false, error: error.message }, 500);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
 });
 
@@ -199,26 +188,26 @@ entitiesRouter.put("/:entitySlug/members/:memberId", async (c) => {
 
   const { role } = body;
   if (!role) {
-    return c.json({ success: false, error: "role is required" }, 400);
+    return c.json(errorResponse("role is required"), 400);
   }
 
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can manage members
     const canManage = await helpers.permissions.canManageMembers(entity.id, userId);
     if (!canManage) {
-      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+      return c.json(errorResponse("Insufficient permissions"), 403);
     }
 
     const updated = await helpers.members.updateMemberRole(entity.id, memberId, role);
-    return c.json({ success: true, data: updated });
+    return c.json(successResponse(updated));
   } catch (error: any) {
     console.error("Error updating member role:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 
@@ -233,20 +222,20 @@ entitiesRouter.delete("/:entitySlug/members/:memberId", async (c) => {
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can manage members
     const canManage = await helpers.permissions.canManageMembers(entity.id, userId);
     if (!canManage) {
-      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+      return c.json(errorResponse("Insufficient permissions"), 403);
     }
 
     await helpers.members.removeMember(entity.id, memberId);
-    return c.json({ success: true });
+    return c.json(successResponse(null));
   } catch (error: any) {
     console.error("Error removing member:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 
@@ -264,20 +253,20 @@ entitiesRouter.get("/:entitySlug/invitations", async (c) => {
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can manage members (required to see invitations)
     const canManage = await helpers.permissions.canManageMembers(entity.id, userId);
     if (!canManage) {
-      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+      return c.json(errorResponse("Insufficient permissions"), 403);
     }
 
     const invitations = await helpers.invitations.getEntityInvitations(entity.id);
-    return c.json({ success: true, data: invitations });
+    return c.json(successResponse(invitations));
   } catch (error: any) {
     console.error("Error listing invitations:", error);
-    return c.json({ success: false, error: error.message }, 500);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
 });
 
@@ -291,19 +280,19 @@ entitiesRouter.post("/:entitySlug/invitations", async (c) => {
 
   const { email, role } = body;
   if (!email || !role) {
-    return c.json({ success: false, error: "email and role are required" }, 400);
+    return c.json(errorResponse("email and role are required"), 400);
   }
 
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can invite members
     const canInvite = await helpers.permissions.canInviteMembers(entity.id, userId);
     if (!canInvite) {
-      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+      return c.json(errorResponse("Insufficient permissions"), 403);
     }
 
     const invitation = await helpers.invitations.createInvitation(entity.id, userId, {
@@ -317,10 +306,10 @@ entitiesRouter.post("/:entitySlug/invitations", async (c) => {
       entityName: entity.displayName,
     }).catch((err) => console.error("Failed to send invitation email:", err));
 
-    return c.json({ success: true, data: invitation }, 201);
+    return c.json(successResponse(invitation), 201);
   } catch (error: any) {
     console.error("Error creating invitation:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 
@@ -336,13 +325,13 @@ entitiesRouter.put("/:entitySlug/invitations/:invitationId", async (c) => {
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can manage members (admin only)
     const canManage = await helpers.permissions.canManageMembers(entity.id, userId);
     if (!canManage) {
-      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+      return c.json(errorResponse("Insufficient permissions"), 403);
     }
 
     const renewed = await helpers.invitations.renewInvitation(invitationId);
@@ -353,10 +342,10 @@ entitiesRouter.put("/:entitySlug/invitations/:invitationId", async (c) => {
       entityName: entity.displayName,
     }).catch((err) => console.error("Failed to resend invitation email:", err));
 
-    return c.json({ success: true, data: renewed });
+    return c.json(successResponse(renewed));
   } catch (error: any) {
     console.error("Error renewing invitation:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 
@@ -371,20 +360,20 @@ entitiesRouter.delete("/:entitySlug/invitations/:invitationId", async (c) => {
   try {
     const entity = await helpers.entity.getEntityBySlug(entitySlug);
     if (!entity) {
-      return c.json({ success: false, error: "Entity not found" }, 404);
+      return c.json(errorResponse("Entity not found"), 404);
     }
 
     // Check if user can manage members
     const canManage = await helpers.permissions.canManageMembers(entity.id, userId);
     if (!canManage) {
-      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+      return c.json(errorResponse("Insufficient permissions"), 403);
     }
 
     await helpers.invitations.cancelInvitation(invitationId);
-    return c.json({ success: true });
+    return c.json(successResponse(null));
   } catch (error: any) {
     console.error("Error canceling invitation:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 

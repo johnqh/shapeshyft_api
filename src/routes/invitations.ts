@@ -4,19 +4,8 @@
  */
 
 import { Hono } from "hono";
-import { db, entities, entityMembers, entityInvitations, users } from "../db";
-import { createEntityHelpers, type InvitationHelperConfig } from "@sudobility/entity_service";
-
-// Create entity helpers with shapeshyft schema
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
+import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
+import { entityHelpers as helpers } from "../lib/entity-helpers";
 
 type Variables = {
   userId: string;
@@ -32,15 +21,15 @@ invitationsRouter.get("/", async (c) => {
   const userEmail = c.get("userEmail");
 
   if (!userEmail) {
-    return c.json({ success: true, data: [] });
+    return c.json(successResponse([]));
   }
 
   try {
     const invitations = await helpers.invitations.getUserPendingInvitations(userEmail);
-    return c.json({ success: true, data: invitations });
+    return c.json(successResponse(invitations));
   } catch (error: any) {
     console.error("Error listing user invitations:", error);
-    return c.json({ success: false, error: error.message }, 500);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
 });
 
@@ -53,10 +42,10 @@ invitationsRouter.post("/:token/accept", async (c) => {
 
   try {
     await helpers.invitations.acceptInvitation(token, userId);
-    return c.json({ success: true });
+    return c.json(successResponse(null));
   } catch (error: any) {
     console.error("Error accepting invitation:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 
@@ -68,10 +57,10 @@ invitationsRouter.post("/:token/decline", async (c) => {
 
   try {
     await helpers.invitations.declineInvitation(token);
-    return c.json({ success: true });
+    return c.json(successResponse(null));
   } catch (error: any) {
     console.error("Error declining invitation:", error);
-    return c.json({ success: false, error: error.message }, 400);
+    return c.json(errorResponse(error.message || "Bad request"), 400);
   }
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.86",
+  "version": "1.0.87",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -18,7 +18,8 @@
     "typecheck": "bunx tsc --noEmit",
     "format": "bunx prettier --write src",
     "format:check": "bunx prettier --check src",
-    "db:init": "bun run src/db/init.ts"
+    "db:init": "bun run src/db/init.ts",
+    "verify": "bun run typecheck && bun run lint && bun test"
   },
   "devDependencies": {
     "@types/bun": "latest",

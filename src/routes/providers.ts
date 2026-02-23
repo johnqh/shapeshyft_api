@@ -27,10 +27,12 @@ const providerParamSchema = z.object({
 
 /**
  * GET /providers
- * Returns list of all available LLM providers with their configuration
+ * Returns list of all available LLM providers with their configuration.
+ * Cached for 1 hour since provider data is static.
  */
 providersRouter.get("/", async (c) => {
   try {
+    c.header("Cache-Control", "public, max-age=3600, s-maxage=3600");
     return c.json(successResponse(PROVIDERS));
   } catch (error: unknown) {
     console.error("Error getting providers:", error);
@@ -41,7 +43,8 @@ providersRouter.get("/", async (c) => {
 
 /**
  * GET /providers/:provider
- * Returns configuration for a specific provider
+ * Returns configuration for a specific provider.
+ * Cached for 1 hour since provider data is static.
  */
 providersRouter.get(
   "/:provider",
@@ -55,6 +58,7 @@ providersRouter.get(
         return c.json(errorResponse("Provider not found"), 404);
       }
 
+      c.header("Cache-Control", "public, max-age=3600, s-maxage=3600");
       return c.json(successResponse(providerConfig));
     } catch (error: unknown) {
       console.error("Error getting provider:", error);
@@ -66,7 +70,8 @@ providersRouter.get(
 
 /**
  * GET /providers/:provider/models
- * Returns list of models for a provider with their capabilities and pricing
+ * Returns list of models for a provider with their capabilities and pricing.
+ * Cached for 1 hour since model data is static.
  */
 providersRouter.get(
   "/:provider/models",
@@ -89,6 +94,7 @@ providersRouter.get(
         pricing: MODEL_PRICING[modelId] ?? DEFAULT_MODEL_PRICING,
       }));
 
+      c.header("Cache-Control", "public, max-age=3600, s-maxage=3600");
       return c.json(
         successResponse({
           provider: providerConfig,

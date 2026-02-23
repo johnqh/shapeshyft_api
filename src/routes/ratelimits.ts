@@ -71,7 +71,7 @@ async function getEntityIdForRateLimits(
     .from(entityMembers)
     .where(eq(entityMembers.entity_id, entity.id));
 
-  const isMember = memberRows.some((m) => m.user_id === firebaseUid);
+  const isMember = memberRows.some((m) => m.user_id === firebaseUid && m.is_active);
   if (!isMember) {
     return { entityId: null, error: "Access denied to entity" };
   }

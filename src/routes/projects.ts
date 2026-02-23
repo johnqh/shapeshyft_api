@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
-import { db, entities, entityMembers, projects, entityInvitations, users } from "../db";
+import { db, projects } from "../db";
 import {
   projectCreateSchema,
   projectUpdateSchema,
@@ -20,48 +20,9 @@ import {
   encryptProjectApiKey,
   decryptProjectApiKey,
 } from "../lib/api-key";
-import { createEntityHelpers, type InvitationHelperConfig, type Entity } from "@sudobility/entity_service";
+import { getEntityWithPermission, getPermissionErrorStatus } from "../lib/entity-helpers";
 
 const projectsRouter = new Hono();
-
-// Create entity helpers
-const config: InvitationHelperConfig = {
-  db: db as any,
-  entitiesTable: entities,
-  membersTable: entityMembers,
-  invitationsTable: entityInvitations,
-  usersTable: users,
-};
-
-const helpers = createEntityHelpers(config);
-
-/**
- * Helper to get entity by slug and verify user membership
- */
-async function getEntityWithPermission(
-  entitySlug: string,
-  userId: string,
-  requireEdit = false
-): Promise<{ entity: Entity; error?: never; errorCode?: never } | { entity?: never; error: string; errorCode?: string }> {
-  const entity = await helpers.entity.getEntityBySlug(entitySlug);
-  if (!entity) {
-    return { error: "Entity not found", errorCode: "ENTITY_NOT_FOUND" };
-  }
-
-  if (requireEdit) {
-    const canEdit = await helpers.permissions.canCreateProjects(entity.id, userId);
-    if (!canEdit) {
-      return { error: "Your role does not have permission to create projects", errorCode: "ROLE_CANNOT_CREATE_PROJECTS" };
-    }
-  } else {
-    const canView = await helpers.permissions.canViewEntity(entity.id, userId);
-    if (!canView) {
-      return { error: "Access denied", errorCode: "ACCESS_DENIED" };
-    }
-  }
-
-  return { entity };
-}
 
 // GET all projects for entity
 projectsRouter.get(
@@ -74,7 +35,7 @@ projectsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const rows = await db
@@ -101,7 +62,7 @@ projectsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const rows = await db
@@ -136,7 +97,7 @@ projectsRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       // Check for duplicate project name
@@ -193,7 +154,7 @@ projectsRouter.put(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       // Check if project exists
@@ -258,7 +219,7 @@ projectsRouter.delete(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const rows = await db
@@ -289,7 +250,7 @@ projectsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       const rows = await db
@@ -337,7 +298,7 @@ projectsRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json({ ...errorResponse(result.error), errorCode: result.errorCode }, result.errorCode === "ENTITY_NOT_FOUND" ? 404 : 403);
+        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
       }
 
       // Check if project exists

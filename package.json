@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.91",
+  "version": "1.0.92",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -48,7 +48,7 @@
     "@sudobility/entity_service": "^1.0.30",
     "@sudobility/ratelimit_service": "^1.0.30",
     "@sudobility/shapeshyft_types": "^1.0.48",
-    "@sudobility/subscription_service": "^1.0.13",
+    "@sudobility/subscription_service": "^1.0.14",
     "@sudobility/types": "^1.9.59",
     "drizzle-orm": "^0.45.0",
     "firebase-admin": "^13.6.0",

@@ -19,7 +19,7 @@ import type {
 } from "./types";
 import { isGenerativeModel } from "../../lib/capability-validator";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 export class GeminiProvider implements ILLMProvider {
   readonly providerName = "gemini" as const;

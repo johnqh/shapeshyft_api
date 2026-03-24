@@ -161,7 +161,7 @@ describe("Capability Validator", () => {
       };
 
       const result = validateMediaCapabilities({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         provider: "gemini",
         inputMedia: [media],
         expectsOutput: {},

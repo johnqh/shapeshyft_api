@@ -27,6 +27,32 @@ export class CustomLLMProvider implements ILLMProvider {
     }
     this.endpointUrl = url;
     this.timeout = 600_000; // 10 minutes (local models can be slow)
+
+    // Configure LM Studio timeout if the endpoint looks like LM Studio
+    this.configureLMStudioTimeout(config.endpointUrl);
+  }
+
+  /**
+   * If the endpoint is an LM Studio server, set its request timeout
+   * to match our client timeout via the LMS.SetTimeout API command.
+   */
+  private async configureLMStudioTimeout(originalUrl: string): Promise<void> {
+    try {
+      const url = new URL(originalUrl);
+      const lmsApiUrl = `${url.protocol}//${url.host}/api/v1/lms`;
+
+      await fetch(lmsApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command: "LMS.SetTimeout",
+          args: [this.timeout],
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      // Not LM Studio or API not available — ignore silently
+    }
   }
 
   async generate(request: LLMRequest): Promise<LLMResponse> {

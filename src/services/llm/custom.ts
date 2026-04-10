@@ -227,7 +227,7 @@ export class CustomLLMProvider implements ILLMProvider {
 
     // Extract JSON from response
     const extracted = this.extractJson(rawResponse);
-    const content = JSON.parse(extracted);
+    const content = this.safeJsonParse(extracted);
 
     return { rawResponse, content };
   }
@@ -275,6 +275,37 @@ export class CustomLLMProvider implements ILLMProvider {
 
     // Return cleaned text as last resort
     return cleaned;
+  }
+
+  /**
+   * Parse JSON with recovery for common LLM output issues:
+   * - Literal newlines/tabs inside string values
+   * - Invalid escape sequences
+   */
+  private safeJsonParse(text: string): unknown {
+    try {
+      return JSON.parse(text);
+    } catch {
+      // Fix literal newlines/tabs inside JSON string values
+      // Replace unescaped control characters within strings
+      const fixed = text.replace(
+        /"(?:[^"\\]|\\.)*"/g,
+        (match) => match
+          .replace(/(?<!\\)\n/g, "\\n")
+          .replace(/(?<!\\)\r/g, "\\r")
+          .replace(/(?<!\\)\t/g, "\\t")
+      );
+      try {
+        return JSON.parse(fixed);
+      } catch {
+        // Last resort: strip all control characters inside strings
+        const stripped = text.replace(
+          /"(?:[^"\\]|\\.)*"/g,
+          (match) => match.replace(/[\x00-\x1f]/g, " ")
+        );
+        return JSON.parse(stripped);
+      }
+    }
   }
 
   /**

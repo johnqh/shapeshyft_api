@@ -206,7 +206,8 @@ export function buildSystemPrompt(
 
   // JSON instruction
   parts.push(
-    "\n## Response Format\nRespond with valid JSON only. Do not include any text outside the JSON object."
+    "\n## Response Format\nRespond with valid JSON only. Do not include any text outside the JSON object. " +
+    "IMPORTANT: All string values must use proper JSON escaping — use \\\" for double quotes, \\n for newlines, \\\\ for backslashes."
   );
 
   return parts.join("\n");
@@ -319,7 +320,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
     case "mistral":
       return {
         baseInstruction: "You are a helpful assistant specialized in producing structured data output.",
-        jsonInstruction: "Respond with valid JSON only. No markdown, no explanations, just the JSON object.",
+        jsonInstruction: "Respond with valid JSON only. No markdown, no explanations, just the JSON object. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
         includeExample: true,
         verboseSchema: false,
       };
@@ -327,7 +328,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
     case "cohere":
       return {
         baseInstruction: "You are a helpful assistant that generates structured data responses.",
-        jsonInstruction: "Output valid JSON only. Do not include any text, markdown, or explanations outside the JSON.",
+        jsonInstruction: "Output valid JSON only. Do not include any text, markdown, or explanations outside the JSON. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
         includeExample: true,
         verboseSchema: true,
       };
@@ -335,7 +336,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
     case "groq":
       return {
         baseInstruction: "You are a fast, efficient assistant that produces structured data.",
-        jsonInstruction: "Respond with valid JSON only.",
+        jsonInstruction: "Respond with valid JSON only. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
         includeExample: true,
         verboseSchema: false,
       };
@@ -343,7 +344,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
     case "xai":
       return {
         baseInstruction: "You are Grok, an AI assistant. Generate structured data output based on the given input.",
-        jsonInstruction: "Return valid JSON only. No additional text or formatting.",
+        jsonInstruction: "Return valid JSON only. No additional text or formatting. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
         includeExample: true,
         verboseSchema: true,
       };
@@ -351,7 +352,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
     case "deepseek":
       return {
         baseInstruction: "You are a helpful assistant that produces structured JSON output.",
-        jsonInstruction: "Respond with valid JSON only. Do not include markdown code blocks or any text outside the JSON.",
+        jsonInstruction: "Respond with valid JSON only. Do not include markdown code blocks or any text outside the JSON. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
         includeExample: true,
         verboseSchema: true,
         additionalInstructions: "Analyze the input carefully before generating the structured response.",
@@ -360,7 +361,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
     case "perplexity":
       return {
         baseInstruction: "You are a helpful assistant that produces structured data output based on available information.",
-        jsonInstruction: "Output valid JSON only. No citations, no explanations, just the JSON object.",
+        jsonInstruction: "Output valid JSON only. No citations, no explanations, just the JSON object. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
         includeExample: true,
         verboseSchema: false,
         additionalInstructions: "Focus on the specific data requested, not general information.",
@@ -378,7 +379,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
         jsonInstruction:
           "Respond with valid JSON only. Do not include any text, markdown code blocks, or thinking outside the JSON object. " +
           "IMPORTANT: All string values in the JSON must use proper JSON escaping. " +
-          "Use \\n for newlines, \\t for tabs, and \\\\ for backslashes inside string values. " +
+          "Use \\\" for double quotes, \\n for newlines, \\t for tabs, and \\\\ for backslashes inside string values. " +
           "Do not put literal newlines or unescaped special characters inside JSON strings.",
         includeExample: true,
         verboseSchema: false,

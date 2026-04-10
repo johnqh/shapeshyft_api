@@ -193,6 +193,7 @@ export class CustomLLMProvider implements ILLMProvider {
 
   /**
    * Parse JSON with recovery for common LLM output issues:
+   * - Unescaped double quotes inside string values
    * - Literal newlines/tabs inside string values
    * - Invalid escape sequences
    */
@@ -200,26 +201,88 @@ export class CustomLLMProvider implements ILLMProvider {
     try {
       return JSON.parse(text);
     } catch {
-      // Fix literal newlines/tabs inside JSON string values
-      // Replace unescaped control characters within strings
-      const fixed = text.replace(
-        /"(?:[^"\\]|\\.)*"/g,
-        (match) => match
-          .replace(/(?<!\\)\n/g, "\\n")
-          .replace(/(?<!\\)\r/g, "\\r")
-          .replace(/(?<!\\)\t/g, "\\t")
-      );
+      // Try repairing unescaped quotes inside string values first,
+      // since regex-based fixes can't match strings correctly with broken quotes
+      const repaired = this.repairJsonQuotes(text);
       try {
-        return JSON.parse(fixed);
+        return JSON.parse(repaired);
       } catch {
-        // Last resort: strip all control characters inside strings
-        const stripped = text.replace(
+        // Fix literal newlines/tabs inside JSON string values
+        const fixed = repaired.replace(
           /"(?:[^"\\]|\\.)*"/g,
-          (match) => match.replace(/[\x00-\x1f]/g, " ")
+          (match) => match
+            .replace(/(?<!\\)\n/g, "\\n")
+            .replace(/(?<!\\)\r/g, "\\r")
+            .replace(/(?<!\\)\t/g, "\\t")
         );
-        return JSON.parse(stripped);
+        try {
+          return JSON.parse(fixed);
+        } catch {
+          // Last resort: strip all control characters inside strings
+          const stripped = repaired.replace(
+            /"(?:[^"\\]|\\.)*"/g,
+            (match) => match.replace(/[\x00-\x1f]/g, " ")
+          );
+          return JSON.parse(stripped);
+        }
       }
     }
+  }
+
+  /**
+   * Repair unescaped double quotes inside JSON string values.
+   * Uses a heuristic: a quote inside a string is structural (closing) if followed
+   * by JSON structural characters (:, }, ], ,) after optional whitespace.
+   * Otherwise it's an unescaped content quote and gets escaped.
+   */
+  private repairJsonQuotes(text: string): string {
+    const result: string[] = [];
+    let i = 0;
+    let inString = false;
+
+    while (i < text.length) {
+      const ch = text[i]!;
+
+      if (inString) {
+        if (ch === "\\") {
+          // Escape sequence — pass through both characters
+          result.push(ch);
+          i++;
+          if (i < text.length) {
+            result.push(text[i]!);
+            i++;
+          }
+          continue;
+        }
+        if (ch === '"') {
+          // Look ahead past whitespace for a JSON structural character
+          let j = i + 1;
+          while (j < text.length && " \t\n\r".includes(text[j]!)) {
+            j++;
+          }
+          const next = j < text.length ? text[j]! : "";
+          if (next === ":" || next === "," || next === "}" || next === "]" || next === "") {
+            // Structural closing quote
+            inString = false;
+            result.push(ch);
+          } else {
+            // Unescaped inner quote — escape it
+            result.push("\\", '"');
+          }
+          i++;
+          continue;
+        }
+        result.push(ch);
+      } else {
+        if (ch === '"') {
+          inString = true;
+        }
+        result.push(ch);
+      }
+      i++;
+    }
+
+    return result.join("");
   }
 
   /**

@@ -201,9 +201,19 @@ export class CustomLLMProvider implements ILLMProvider {
     try {
       return JSON.parse(text);
     } catch {
-      // Try repairing unescaped quotes inside string values first,
+      // Fix broken escape sequences first (e.g., "\ n" -> "\n", "\ t" -> "\t")
+      // LLMs sometimes insert a space between backslash and escape character
+      let repaired = text.replace(/\\ ([nrtbf"\\\/])/g, "\\$1");
+
+      try {
+        return JSON.parse(repaired);
+      } catch {
+        // noop
+      }
+
+      // Repair unescaped quotes inside string values,
       // since regex-based fixes can't match strings correctly with broken quotes
-      const repaired = this.repairJsonQuotes(text);
+      repaired = this.repairJsonQuotes(repaired);
       try {
         return JSON.parse(repaired);
       } catch {

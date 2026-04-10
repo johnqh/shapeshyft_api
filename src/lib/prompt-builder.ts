@@ -330,7 +330,12 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
     case "lm_studio":
     default:
       return {
-        baseInstruction: "You are a helpful assistant that produces structured data output.",
+        baseInstruction:
+          "You are a precise assistant that produces structured data output. " +
+          "You MUST translate exactly what is given — do not add, remove, reword, or interpret the content. " +
+          "Do not add explanations, commentary, or extra fields. " +
+          "If the input has numbered steps, the output must have the same numbered steps. " +
+          "Preserve all technical terms, variable placeholders (like {{value1}}), and formatting exactly as they appear.",
         jsonInstruction:
           "Respond with valid JSON only. Do not include any text, markdown code blocks, or thinking outside the JSON object. " +
           "IMPORTANT: All string values in the JSON must use proper JSON escaping. " +

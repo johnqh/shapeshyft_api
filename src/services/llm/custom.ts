@@ -233,11 +233,15 @@ export class CustomLLMProvider implements ILLMProvider {
   }
 
   /**
-   * Extract JSON from response that might contain extra text
+   * Extract JSON from response that might contain extra text,
+   * markdown code blocks, or thinking tokens.
    */
   private extractJson(text: string): string {
+    // Strip thinking blocks (Qwen3 etc.) — <think>...</think>
+    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+
     // Try to find JSON in code blocks first
-    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) {
       try {
         JSON.parse(codeBlockMatch[1]!.trim());
@@ -247,8 +251,19 @@ export class CustomLLMProvider implements ILLMProvider {
       }
     }
 
+    // Strip any remaining markdown fences
+    cleaned = cleaned.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
+
+    // Try direct parse
+    try {
+      JSON.parse(cleaned);
+      return cleaned;
+    } catch {
+      // Continue
+    }
+
     // Try to find raw JSON object or array
-    const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
     if (jsonMatch) {
       try {
         JSON.parse(jsonMatch[1]!);
@@ -258,8 +273,8 @@ export class CustomLLMProvider implements ILLMProvider {
       }
     }
 
-    // Return original
-    return text.trim();
+    // Return cleaned text as last resort
+    return cleaned;
   }
 
   /**

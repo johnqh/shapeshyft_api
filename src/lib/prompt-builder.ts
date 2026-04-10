@@ -331,7 +331,11 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
     default:
       return {
         baseInstruction: "You are a helpful assistant that produces structured data output.",
-        jsonInstruction: "Respond with valid JSON only. Do not include any text outside the JSON object.",
+        jsonInstruction:
+          "Respond with valid JSON only. Do not include any text, markdown code blocks, or thinking outside the JSON object. " +
+          "IMPORTANT: All string values in the JSON must use proper JSON escaping. " +
+          "Use \\n for newlines, \\t for tabs, and \\\\ for backslashes inside string values. " +
+          "Do not put literal newlines or unescaped special characters inside JSON strings.",
         includeExample: true,
         verboseSchema: false,
       };

@@ -8,6 +8,7 @@ import type {
 /**
  * Custom LLM Server provider that forwards requests to user's endpoint.
  * Expects the endpoint to follow OpenAI-compatible format.
+ * Uses streaming to avoid LM Studio's 300s idle timeout.
  */
 export class CustomLLMProvider implements ILLMProvider {
   readonly providerName = "lm_studio" as const;
@@ -27,38 +28,14 @@ export class CustomLLMProvider implements ILLMProvider {
     }
     this.endpointUrl = url;
     this.timeout = 600_000; // 10 minutes (local models can be slow)
-
-    // Configure LM Studio timeout if the endpoint looks like LM Studio
-    this.configureLMStudioTimeout(config.endpointUrl);
-  }
-
-  /**
-   * If the endpoint is an LM Studio server, set its request timeout
-   * to match our client timeout via the LMS.SetTimeout API command.
-   */
-  private async configureLMStudioTimeout(originalUrl: string): Promise<void> {
-    try {
-      const url = new URL(originalUrl);
-      const lmsApiUrl = `${url.protocol}//${url.host}/api/v1/lms`;
-
-      await fetch(lmsApiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          command: "LMS.SetTimeout",
-          args: [this.timeout],
-        }),
-        signal: AbortSignal.timeout(5000),
-      });
-    } catch {
-      // Not LM Studio or API not available — ignore silently
-    }
   }
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
     const startTime = Date.now();
 
     const payload = this.buildApiPayload(request);
+    // Use streaming to keep connection alive and avoid LM Studio's 300s timeout
+    payload.stream = true;
 
     let response: Response;
     try {
@@ -83,7 +60,8 @@ export class CustomLLMProvider implements ILLMProvider {
       throw new Error(`LLM Server error (${response.status}): ${errorText}`);
     }
 
-    const result = (await response.json()) as Record<string, unknown>;
+    // Collect streamed SSE chunks into a complete response
+    const result = await this.collectStream(response);
     const latencyMs = Date.now() - startTime;
 
     // Parse response - try multiple common formats
@@ -97,6 +75,96 @@ export class CustomLLMProvider implements ILLMProvider {
       model: request.model ?? "custom",
       provider: this.providerName,
       latencyMs,
+    };
+  }
+
+  /**
+   * Collect OpenAI-compatible SSE stream into a single response object.
+   * Each chunk is a `data: {...}` line with a delta. We reconstruct
+   * the full message from the deltas, plus capture usage from the final chunk.
+   */
+  private async collectStream(response: Response): Promise<Record<string, unknown>> {
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body for streaming");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let contentText = "";
+    let toolCallArgs = "";
+    let toolCallName = "";
+    let toolCallId = "";
+    let finishReason: string | null = null;
+    let usage: Record<string, unknown> | null = null;
+    let model = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? ""; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === "data: [DONE]") continue;
+        if (!trimmed.startsWith("data: ")) continue;
+
+        try {
+          const chunk = JSON.parse(trimmed.slice(6)) as Record<string, unknown>;
+
+          if (chunk.model) model = chunk.model as string;
+
+          // Extract usage from final chunk (OpenAI stream_options)
+          if (chunk.usage) usage = chunk.usage as Record<string, unknown>;
+
+          const choices = chunk.choices as Array<Record<string, unknown>> | undefined;
+          if (!choices?.[0]) continue;
+
+          const choice = choices[0];
+          if (choice.finish_reason) finishReason = choice.finish_reason as string;
+
+          const delta = choice.delta as Record<string, unknown> | undefined;
+          if (!delta) continue;
+
+          // Accumulate content text
+          if (typeof delta.content === "string") {
+            contentText += delta.content;
+          }
+
+          // Accumulate tool call arguments
+          const toolCalls = delta.tool_calls as Array<Record<string, unknown>> | undefined;
+          if (toolCalls?.[0]) {
+            const tc = toolCalls[0];
+            if (tc.id) toolCallId = tc.id as string;
+            const fn = tc.function as Record<string, unknown> | undefined;
+            if (fn?.name) toolCallName = fn.name as string;
+            if (typeof fn?.arguments === "string") toolCallArgs += fn.arguments;
+          }
+        } catch {
+          // Skip malformed chunks
+        }
+      }
+    }
+
+    // Reconstruct a non-streaming OpenAI response object
+    const message: Record<string, unknown> = { role: "assistant" };
+    if (toolCallArgs) {
+      message.tool_calls = [{
+        id: toolCallId,
+        type: "function",
+        function: { name: toolCallName, arguments: toolCallArgs },
+      }];
+    } else {
+      message.content = contentText;
+    }
+
+    return {
+      choices: [{ message, finish_reason: finishReason ?? "stop" }],
+      model,
+      ...(usage ? { usage } : {}),
     };
   }
 

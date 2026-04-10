@@ -1,6 +1,6 @@
 # ShapeShyft API
 
-Backend API server for ShapeShyft - an LLM structured output platform (v1.0.83).
+Backend API server for ShapeShyft - an LLM structured output platform (v1.0.95).
 
 ## Tech Stack
 
@@ -104,12 +104,14 @@ bun run start        # Start production server
 bun run build        # Build for production (bun build)
 bun run start:prod   # Run production build
 bun test             # Run unit tests (tests/unit/)
+bun run test:watch   # Watch mode for unit tests
 bun run test:integration  # Run integration tests (requires test database)
 bun run test:setup   # Set up test database
 bun run lint         # Run ESLint
 bun run typecheck    # TypeScript type check
 bun run format       # Format with Prettier
 bun run db:init      # Initialize database tables
+bun run verify       # Pre-commit: typecheck + lint + unit tests
 ```
 
 ## Database
@@ -209,6 +211,10 @@ All routes under `/api/v1/`:
 
 ## Architecture
 
+### Route Registration Order
+
+In `src/routes/index.ts`, public routes are registered **before** admin routes. Admin routes apply `firebaseAuthMiddleware` on a wildcard (`*`). Registration order matters -- public routes must come first to avoid auth interception.
+
 ### Auth Split
 
 - **Public routes** (`/ai/*`, `/providers/*`): Project API key authentication via `X-API-Key` header + optional IP allowlist
@@ -248,6 +254,122 @@ Each provider uses its native structured output mechanism:
 5. Provider-specific content blocks built (base64, URL, inlineData, etc.)
 6. Generated media returned as base64 or uploaded to user storage (GCS/S3)
 
+## Code Patterns
+
+### Route Handler Pattern
+
+All route files export a Hono instance. Handlers use `zValidator` for input validation and context variables set by `firebaseAuthMiddleware`:
+
+```typescript
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { entitySlugParamSchema, myCreateSchema } from "../schemas";
+import { getEntityWithPermission } from "../lib/entity-helpers";
+
+const app = new Hono();
+
+app.get("/:entitySlug/things",
+  zValidator("param", entitySlugParamSchema),
+  async (c) => {
+    const userId = c.get("userId");        // Set by firebaseAuthMiddleware
+    const { entitySlug } = c.req.valid("param");
+
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error) return c.json(errorResponse(result.error), 403);
+
+    const rows = await db.select().from(things).where(eq(things.entity_id, result.entity.id));
+    return c.json(successResponse(rows));
+  }
+);
+
+app.post("/:entitySlug/things",
+  zValidator("param", entitySlugParamSchema),
+  zValidator("json", myCreateSchema),
+  async (c) => {
+    const userId = c.get("userId");
+    const { entitySlug } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const result = await getEntityWithPermission(entitySlug, userId, true); // true = requireEdit
+    if (result.error) return c.json(errorResponse(result.error), 403);
+
+    try {
+      const [row] = await db.insert(things).values({ ...body, entity_id: result.entity.id }).returning();
+      return c.json(successResponse(row), 201);
+    } catch (error: any) {
+      console.error("Error creating thing:", error);
+      return c.json(errorResponse(error.message || "Internal server error"), 500);
+    }
+  }
+);
+
+export default app;
+```
+
+### Response Format
+
+Always use helpers from `@sudobility/shapeshyft_types`:
+
+```typescript
+import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
+
+return c.json(successResponse(data));           // { success: true, data, timestamp }
+return c.json(errorResponse("Not found"), 404); // { success: false, error, timestamp }
+```
+
+### Permission Check Pattern
+
+```typescript
+import { getEntityWithPermission } from "../lib/entity-helpers";
+
+// Read-only access
+const result = await getEntityWithPermission(entitySlug, userId);
+
+// Write access
+const result = await getEntityWithPermission(entitySlug, userId, true);
+
+if (result.error) {
+  return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+}
+const entity = result.entity;
+```
+
+### Encryption Pattern
+
+```typescript
+import { encryptApiKey, decryptApiKey } from "../lib/encryption";
+
+// Encrypt (returns { encrypted, iv })
+const { encrypted, iv } = encryptApiKey(plaintext);
+
+// Decrypt
+const plaintext = decryptApiKey(encrypted, iv);
+```
+
+## Task Recipes
+
+### Adding a New Admin Route
+
+1. Create Zod schemas in `src/schemas/index.ts`
+2. Create route file in `src/routes/myroute.ts` following the route handler pattern above
+3. Register in `src/routes/index.ts` under `adminRoutes.route("/mypath", myRoute)`
+4. Add unit/integration tests in `tests/`
+
+### Adding a New LLM Provider
+
+1. Check if OpenAI-compatible -- if yes, add to `PROVIDER_ENDPOINTS` in `src/services/llm/index.ts` and reuse `OpenAIProvider`
+2. If not compatible, create `src/services/llm/myprovider.ts` implementing `ILLMProvider`
+3. Add provider config to `src/config/providers.ts` (models, capabilities, pricing)
+4. Register in `createLLMProvider()` factory in `src/services/llm/index.ts`
+5. Add capability validation if provider has unique constraints
+
+### Adding a New Database Table
+
+1. Define table in `src/db/schema.ts` using `shapeshyftSchema.table()` (NOT `pgTable`)
+2. Run `bun run db:init` to create the table
+3. Add CRUD routes and Zod schemas
+4. The `shapeshyft` schema prefix is automatic via `shapeshyftSchema`
+
 ## Testing
 
 Tests use **Vitest** (NOT bun:test) with a test database:
@@ -259,10 +381,47 @@ bun test tests/unit/encryption.test.ts  # Single file
 bun test --filter "should filter"  # Pattern match
 ```
 
-Integration tests require:
-1. A running PostgreSQL instance
-2. Running `bun run test:setup` first
-3. Test environment variables in `.env.local` or `.env.test`
+### Unit Test Pattern
+
+```typescript
+import { describe, it, expect, beforeAll } from "vitest";
+
+describe("MyModule", () => {
+  beforeAll(() => {
+    process.env.ENCRYPTION_KEY = "a".repeat(64);
+  });
+
+  it("should do something", () => {
+    const result = myFunction("input");
+    expect(result).toBe("expected");
+  });
+});
+```
+
+### Integration Test Pattern
+
+Integration tests require a running PostgreSQL instance:
+
+```typescript
+import { describe, it, expect, beforeAll } from "vitest";
+import { testApp } from "./utils/test-app";
+import { mockAuth } from "./utils/mock-auth";
+
+describe("Things API", () => {
+  beforeAll(async () => {
+    // test-app.ts sets up a Hono app with mock auth
+  });
+
+  it("should create a thing", async () => {
+    const res = await testApp.request("/api/v1/entities/my-org/things", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...mockAuth.headers },
+      body: JSON.stringify({ name: "test" }),
+    });
+    expect(res.status).toBe(201);
+  });
+});
+```
 
 ## Key Dependencies
 
@@ -355,3 +514,6 @@ bun run test:setup && bun run test:integration
 - **`getEntityWithPermission()` is centralized** -- lives in `src/lib/entity-helpers.ts` along with the singleton `entityHelpers` instance. All route files import from there.
 - **Signed URLs expire in 7 days** -- GCS and S3 uploads generate signed URLs with 7-day expiry. Clients must handle expired URLs.
 - **Firebase token verifier uses 5-minute cache** -- reduces Firebase Admin calls but means revoked tokens remain valid for up to 5 minutes.
+- **Route registration order matters** -- public routes must be registered before admin routes in `src/routes/index.ts` to avoid wildcard auth middleware interception.
+- **50MB body limit** -- set in `src/index.ts` via Hono bodyLimit middleware for base64-encoded media uploads.
+- **Entity slug max 12 chars** -- enforced by Zod schema. Important for URL parsing.

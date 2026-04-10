@@ -24,9 +24,41 @@ export function schemaToPromptInstructions(
     for (const [propName, propSchema] of Object.entries(schema.properties)) {
       const prop = propSchema as JsonSchema;
       const isRequired = required.includes(propName);
+      const reqMarker = isRequired ? "(required)" : "(optional)";
+
+      // Handle map type (x-map with additionalProperties)
+      if ((prop as Record<string, unknown>)["x-map"] && prop.additionalProperties && typeof prop.additionalProperties === "object") {
+        const valueProp = prop.additionalProperties as JsonSchema;
+        const keyDesc = (prop as Record<string, unknown>)["x-key-description"] as string | undefined;
+        const valueType = valueProp.type ?? "any";
+        const valueDesc = valueProp.description ?? "";
+        const propDesc = prop.description ?? "";
+
+        lines.push(
+          `${indent}- \`${propName}\` (map) ${reqMarker}: ${propDesc}`
+        );
+        lines.push(
+          `${indent}  Key: string${keyDesc ? ` — ${keyDesc}` : ""}`
+        );
+        lines.push(
+          `${indent}  Value: ${valueType}${valueDesc ? ` — ${valueDesc}` : ""}`
+        );
+
+        // Handle complex value types
+        if (valueType === "object" && valueProp.properties) {
+          lines.push(`${indent}  Value properties:`);
+          lines.push(schemaToPromptInstructions(valueProp, depth + 2));
+        } else if (valueType === "array" && valueProp.items) {
+          lines.push(`${indent}  (each value is an array of items:)`);
+          lines.push(
+            schemaToPromptInstructions(valueProp.items as JsonSchema, depth + 2)
+          );
+        }
+        continue;
+      }
+
       const propType = prop.type ?? "any";
       const propDesc = prop.description ?? "";
-      const reqMarker = isRequired ? "(required)" : "(optional)";
 
       lines.push(
         `${indent}- \`${propName}\` (${propType}) ${reqMarker}: ${propDesc}`
@@ -87,6 +119,13 @@ export function generateSchemaExample(schema: JsonSchema): unknown {
   if (schema.default !== undefined) return schema.default;
   if (schema.enum && schema.enum.length > 0) return schema.enum[0];
 
+  // Map type: object with x-map and additionalProperties
+  if (schemaType === "object" && (schema as Record<string, unknown>)["x-map"] && schema.additionalProperties && typeof schema.additionalProperties === "object") {
+    const keyDesc = (schema as Record<string, unknown>)["x-key-description"] as string | undefined;
+    const sampleKey = keyDesc ? `<${keyDesc.split(/[\s(,]/)[0].toLowerCase()}>` : "<key>";
+    return { [sampleKey]: generateSchemaExample(schema.additionalProperties as JsonSchema) };
+  }
+
   if (schemaType === "object" && schema.properties) {
     const example: Record<string, unknown> = {};
     for (const [propName, propSchema] of Object.entries(schema.properties)) {
@@ -126,7 +165,7 @@ export function isComplexSchema(schema: JsonSchema): boolean {
   if (properties.length > 3) return true;
   return properties.some(p => {
     const prop = p as JsonSchema;
-    return prop.type === "object" || prop.type === "array";
+    return prop.type === "object" || prop.type === "array" || (prop as Record<string, unknown>)["x-map"];
   });
 }
 

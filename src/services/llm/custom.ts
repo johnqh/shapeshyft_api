@@ -227,9 +227,16 @@ export class CustomLLMProvider implements ILLMProvider {
 
     // Extract JSON from response
     const extracted = this.extractJson(rawResponse);
-    const content = this.safeJsonParse(extracted);
-
-    return { rawResponse, content };
+    try {
+      const content = this.safeJsonParse(extracted);
+      return { rawResponse, content };
+    } catch (parseError) {
+      const msg = parseError instanceof Error ? parseError.message : String(parseError);
+      console.error(`[CustomLLM] JSON parse failed: ${msg}`);
+      console.error(`[CustomLLM] Raw response (first 500 chars): ${rawResponse.slice(0, 500)}`);
+      console.error(`[CustomLLM] Extracted (first 500 chars): ${extracted.slice(0, 500)}`);
+      throw new Error(`${msg}\n---RAW---\n${rawResponse.slice(0, 1000)}`);
+    }
   }
 
   /**

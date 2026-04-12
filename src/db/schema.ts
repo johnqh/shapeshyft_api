@@ -247,4 +247,3 @@ export const rateLimitCounters = createRateLimitCountersTable(
   shapeshyftSchema,
   "shapeshyft"
 );
-

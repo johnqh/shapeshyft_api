@@ -8,14 +8,22 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq, and } from "drizzle-orm";
 import { db, llmApiKeys } from "../db";
-import { keyCreateSchema, keyUpdateSchema, keyIdParamSchema, entitySlugParamSchema } from "../schemas";
+import {
+  keyCreateSchema,
+  keyUpdateSchema,
+  keyIdParamSchema,
+  entitySlugParamSchema,
+} from "../schemas";
 import {
   successResponse,
   errorResponse,
   type LlmApiKeySafe,
 } from "@sudobility/shapeshyft_types";
 import { encryptApiKey } from "../lib/encryption";
-import { getEntityWithPermission, getPermissionErrorStatus } from "../lib/entity-helpers";
+import {
+  getEntityWithPermission,
+  getPermissionErrorStatus,
+} from "../lib/entity-helpers";
 
 const keysRouter = new Hono();
 
@@ -37,62 +45,65 @@ function toSafeKey(key: typeof llmApiKeys.$inferSelect): LlmApiKeySafe {
 }
 
 // GET all keys for entity
-keysRouter.get(
-  "/",
-  zValidator("param", entitySlugParamSchema),
-  async c => {
-    try {
-      const userId = c.get("userId");
-      const { entitySlug } = c.req.valid("param");
+keysRouter.get("/", zValidator("param", entitySlugParamSchema), async c => {
+  try {
+    const userId = c.get("userId");
+    const { entitySlug } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
-      }
-
-      const rows = await db
-        .select()
-        .from(llmApiKeys)
-        .where(eq(llmApiKeys.entity_id, result.entity.id));
-
-      return c.json(successResponse(rows.map(toSafeKey)));
-    } catch (error: any) {
-      console.error("Error getting keys:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error !== undefined) {
+      return c.json(
+        errorResponse(result.error),
+        getPermissionErrorStatus(result.errorCode)
+      );
     }
+
+    const rows = await db
+      .select()
+      .from(llmApiKeys)
+      .where(eq(llmApiKeys.entity_id, result.entity.id));
+
+    return c.json(successResponse<LlmApiKeySafe[]>(rows.map(toSafeKey)));
+  } catch (error: any) {
+    console.error("Error getting keys:", error);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
-);
+});
 
 // GET single key
-keysRouter.get(
-  "/:keyId",
-  zValidator("param", keyIdParamSchema),
-  async c => {
-    try {
-      const userId = c.get("userId");
-      const { entitySlug, keyId } = c.req.valid("param");
+keysRouter.get("/:keyId", zValidator("param", keyIdParamSchema), async c => {
+  try {
+    const userId = c.get("userId");
+    const { entitySlug, keyId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
-      }
-
-      const rows = await db
-        .select()
-        .from(llmApiKeys)
-        .where(and(eq(llmApiKeys.entity_id, result.entity.id), eq(llmApiKeys.uuid, keyId)));
-
-      if (rows.length === 0) {
-        return c.json(errorResponse("Key not found"), 404);
-      }
-
-      return c.json(successResponse(toSafeKey(rows[0]!)));
-    } catch (error: any) {
-      console.error("Error getting key:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error !== undefined) {
+      return c.json(
+        errorResponse(result.error),
+        getPermissionErrorStatus(result.errorCode)
+      );
     }
+
+    const rows = await db
+      .select()
+      .from(llmApiKeys)
+      .where(
+        and(
+          eq(llmApiKeys.entity_id, result.entity.id),
+          eq(llmApiKeys.uuid, keyId)
+        )
+      );
+
+    if (rows.length === 0) {
+      return c.json(errorResponse("Key not found"), 404);
+    }
+
+    return c.json(successResponse<LlmApiKeySafe>(toSafeKey(rows[0]!)));
+  } catch (error: any) {
+    console.error("Error getting key:", error);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
-);
+});
 
 // POST create new key
 keysRouter.post(
@@ -107,7 +118,10 @@ keysRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       // Encrypt API key if provided
@@ -132,10 +146,13 @@ keysRouter.post(
         })
         .returning();
 
-      return c.json(successResponse(toSafeKey(rows[0]!)), 201);
+      return c.json(successResponse<LlmApiKeySafe>(toSafeKey(rows[0]!)), 201);
     } catch (error: any) {
       console.error("Error creating key:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -153,7 +170,10 @@ keysRouter.put(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       // Check if key exists and belongs to entity
@@ -161,7 +181,10 @@ keysRouter.put(
         .select()
         .from(llmApiKeys)
         .where(
-          and(eq(llmApiKeys.entity_id, result.entity.id), eq(llmApiKeys.uuid, keyId))
+          and(
+            eq(llmApiKeys.entity_id, result.entity.id),
+            eq(llmApiKeys.uuid, keyId)
+          )
         );
 
       if (existing.length === 0) {
@@ -193,43 +216,50 @@ keysRouter.put(
         .where(eq(llmApiKeys.uuid, keyId))
         .returning();
 
-      return c.json(successResponse(toSafeKey(rows[0]!)));
+      return c.json(successResponse<LlmApiKeySafe>(toSafeKey(rows[0]!)));
     } catch (error: any) {
       console.error("Error updating key:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
 
 // DELETE key
-keysRouter.delete(
-  "/:keyId",
-  zValidator("param", keyIdParamSchema),
-  async c => {
-    try {
-      const userId = c.get("userId");
-      const { entitySlug, keyId } = c.req.valid("param");
+keysRouter.delete("/:keyId", zValidator("param", keyIdParamSchema), async c => {
+  try {
+    const userId = c.get("userId");
+    const { entitySlug, keyId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
-      if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
-      }
-
-      const rows = await db
-        .delete(llmApiKeys)
-        .where(and(eq(llmApiKeys.entity_id, result.entity.id), eq(llmApiKeys.uuid, keyId)))
-        .returning();
-
-      if (rows.length === 0) {
-        return c.json(errorResponse("Key not found"), 404);
-      }
-
-      return c.json(successResponse(toSafeKey(rows[0]!)));
-    } catch (error: any) {
-      console.error("Error deleting key:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+    const result = await getEntityWithPermission(entitySlug, userId, true);
+    if (result.error !== undefined) {
+      return c.json(
+        errorResponse(result.error),
+        getPermissionErrorStatus(result.errorCode)
+      );
     }
+
+    const rows = await db
+      .delete(llmApiKeys)
+      .where(
+        and(
+          eq(llmApiKeys.entity_id, result.entity.id),
+          eq(llmApiKeys.uuid, keyId)
+        )
+      )
+      .returning();
+
+    if (rows.length === 0) {
+      return c.json(errorResponse("Key not found"), 404);
+    }
+
+    return c.json(successResponse<LlmApiKeySafe>(toSafeKey(rows[0]!)));
+  } catch (error: any) {
+    console.error("Error deleting key:", error);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
-);
+});
 
 export default keysRouter;

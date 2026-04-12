@@ -14,42 +14,50 @@ import {
   projectIdParamSchema,
   entitySlugParamSchema,
 } from "../schemas";
-import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
+import {
+  successResponse,
+  errorResponse,
+  type Project,
+  type GetApiKeyResponse,
+  type RefreshApiKeyResponse,
+} from "@sudobility/shapeshyft_types";
 import {
   generateProjectApiKey,
   encryptProjectApiKey,
   decryptProjectApiKey,
 } from "../lib/api-key";
-import { getEntityWithPermission, getPermissionErrorStatus } from "../lib/entity-helpers";
+import {
+  getEntityWithPermission,
+  getPermissionErrorStatus,
+} from "../lib/entity-helpers";
 
 const projectsRouter = new Hono();
 
 // GET all projects for entity
-projectsRouter.get(
-  "/",
-  zValidator("param", entitySlugParamSchema),
-  async c => {
-    try {
-      const userId = c.get("userId");
-      const { entitySlug } = c.req.valid("param");
+projectsRouter.get("/", zValidator("param", entitySlugParamSchema), async c => {
+  try {
+    const userId = c.get("userId");
+    const { entitySlug } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
-      }
-
-      const rows = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.entity_id, result.entity.id));
-
-      return c.json(successResponse(rows));
-    } catch (error: any) {
-      console.error("Error getting projects:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error !== undefined) {
+      return c.json(
+        errorResponse(result.error),
+        getPermissionErrorStatus(result.errorCode)
+      );
     }
+
+    const rows = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.entity_id, result.entity.id));
+
+    return c.json(successResponse<Project[]>(rows as Project[]));
+  } catch (error: any) {
+    console.error("Error getting projects:", error);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
-);
+});
 
 // GET single project
 projectsRouter.get(
@@ -62,24 +70,33 @@ projectsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       const rows = await db
         .select()
         .from(projects)
         .where(
-          and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.uuid, projectId)
+          )
         );
 
       if (rows.length === 0) {
         return c.json(errorResponse("Project not found"), 404);
       }
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Project>(rows[0] as Project));
     } catch (error: any) {
       console.error("Error getting project:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -97,7 +114,10 @@ projectsRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       // Check for duplicate project name
@@ -133,10 +153,13 @@ projectsRouter.post(
         })
         .returning();
 
-      return c.json(successResponse(rows[0]), 201);
+      return c.json(successResponse<Project>(rows[0] as Project), 201);
     } catch (error: any) {
       console.error("Error creating project:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -154,7 +177,10 @@ projectsRouter.put(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       // Check if project exists
@@ -162,7 +188,10 @@ projectsRouter.put(
         .select()
         .from(projects)
         .where(
-          and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.uuid, projectId)
+          )
         );
 
       if (existing.length === 0) {
@@ -200,10 +229,13 @@ projectsRouter.put(
         .where(eq(projects.uuid, projectId))
         .returning();
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Project>(rows[0] as Project));
     } catch (error: any) {
       console.error("Error updating project:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -219,22 +251,33 @@ projectsRouter.delete(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       const rows = await db
         .delete(projects)
-        .where(and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId)))
+        .where(
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.uuid, projectId)
+          )
+        )
         .returning();
 
       if (rows.length === 0) {
         return c.json(errorResponse("Project not found"), 404);
       }
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Project>(rows[0] as Project));
     } catch (error: any) {
       console.error("Error deleting project:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -250,14 +293,20 @@ projectsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       const rows = await db
         .select()
         .from(projects)
         .where(
-          and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.uuid, projectId)
+          )
         );
 
       if (rows.length === 0) {
@@ -275,14 +324,16 @@ projectsRouter.get(
         project.api_key_iv
       );
 
-      return c.json(
-        successResponse({
-          api_key: apiKey,
-        })
-      );
+      const response: GetApiKeyResponse = {
+        api_key: apiKey,
+      };
+      return c.json(successResponse<GetApiKeyResponse>(response));
     } catch (error: any) {
       console.error("Error getting project API key:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -298,7 +349,10 @@ projectsRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       // Check if project exists
@@ -306,7 +360,10 @@ projectsRouter.post(
         .select()
         .from(projects)
         .where(
-          and(eq(projects.entity_id, result.entity.id), eq(projects.uuid, projectId))
+          and(
+            eq(projects.entity_id, result.entity.id),
+            eq(projects.uuid, projectId)
+          )
         );
 
       if (existing.length === 0) {
@@ -329,16 +386,18 @@ projectsRouter.post(
         })
         .where(eq(projects.uuid, projectId));
 
-      return c.json(
-        successResponse({
-          api_key: key,
-          api_key_prefix: prefix,
-          api_key_created_at: createdAt.toISOString(),
-        })
-      );
+      const response: RefreshApiKeyResponse = {
+        api_key: key,
+        api_key_prefix: prefix,
+        api_key_created_at: createdAt.toISOString(),
+      };
+      return c.json(successResponse<RefreshApiKeyResponse>(response));
     } catch (error: any) {
       console.error("Error refreshing project API key:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );

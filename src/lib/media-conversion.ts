@@ -5,10 +5,7 @@
 
 import sharp from "sharp";
 import type { MediaContent } from "@sudobility/shapeshyft_types";
-import {
-  ALLOWED_MIME_TYPES,
-  CONVERTIBLE_MIME_TYPES,
-} from "./media-constants";
+import { ALLOWED_MIME_TYPES, CONVERTIBLE_MIME_TYPES } from "./media-constants";
 
 /**
  * Check if a MIME type needs conversion

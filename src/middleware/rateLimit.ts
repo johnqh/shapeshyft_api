@@ -22,7 +22,6 @@ export const rateLimitsConfig: RateLimitsConfig = {
   bandwidth_ultra: { hourly: undefined, daily: undefined, monthly: undefined },
 };
 
-
 // Lazy-initialized instances to avoid requiring env vars at module load time
 let _rateLimitRouteHandler: RateLimitRouteHandler | null = null;
 let _rateLimitMiddleware: ReturnType<typeof createRateLimitMiddleware> | null =
@@ -58,7 +57,9 @@ export function getRateLimitRouteHandler(): RateLimitRouteHandler {
  * Lazily initialized to avoid requiring REVENUECAT_API_KEY at module load time.
  * Uses single API key - testMode is extracted from URL query parameter to filter sandbox purchases.
  */
-function getRateLimitMiddleware(): ReturnType<typeof createRateLimitMiddleware> {
+function getRateLimitMiddleware(): ReturnType<
+  typeof createRateLimitMiddleware
+> {
   if (!_rateLimitMiddleware) {
     _rateLimitMiddleware = createRateLimitMiddleware({
       revenueCatApiKey: getRequiredEnv("REVENUECAT_API_KEY"),

@@ -41,10 +41,7 @@ interface ParseResult {
  * Parse a data URL into MediaContent.
  * Returns error if invalid or unsupported.
  */
-export function parseDataUrl(
-  value: string,
-  fieldName?: string
-): ParseResult {
+export function parseDataUrl(value: string, fieldName?: string): ParseResult {
   const match = value.match(DATA_URL_REGEX);
   if (!match) {
     return {}; // Not a data URL

@@ -138,10 +138,15 @@ export class CustomLLMProvider implements ILLMProvider {
       const content = this.safeJsonParse(extracted);
       return { rawResponse, content };
     } catch (parseError) {
-      const msg = parseError instanceof Error ? parseError.message : String(parseError);
+      const msg =
+        parseError instanceof Error ? parseError.message : String(parseError);
       console.error(`[CustomLLM] JSON parse failed: ${msg}`);
-      console.error(`[CustomLLM] Raw response (first 500 chars): ${rawResponse.slice(0, 500)}`);
-      console.error(`[CustomLLM] Extracted (first 500 chars): ${extracted.slice(0, 500)}`);
+      console.error(
+        `[CustomLLM] Raw response (first 500 chars): ${rawResponse.slice(0, 500)}`
+      );
+      console.error(
+        `[CustomLLM] Extracted (first 500 chars): ${extracted.slice(0, 500)}`
+      );
       throw new Error(`${msg}\n---RAW---\n${rawResponse.slice(0, 1000)}`);
     }
   }
@@ -166,7 +171,10 @@ export class CustomLLMProvider implements ILLMProvider {
     }
 
     // Strip any remaining markdown fences
-    cleaned = cleaned.replace(/```(?:json)?\s*/g, "").replace(/```/g, "").trim();
+    cleaned = cleaned
+      .replace(/```(?:json)?\s*/g, "")
+      .replace(/```/g, "")
+      .trim();
 
     // Try direct parse
     try {
@@ -218,9 +226,8 @@ export class CustomLLMProvider implements ILLMProvider {
         return JSON.parse(repaired);
       } catch {
         // Fix literal newlines/tabs inside JSON string values
-        const fixed = repaired.replace(
-          /"(?:[^"\\]|\\.)*"/g,
-          (match) => match
+        const fixed = repaired.replace(/"(?:[^"\\]|\\.)*"/g, match =>
+          match
             .replace(/(?<!\\)\n/g, "\\n")
             .replace(/(?<!\\)\r/g, "\\r")
             .replace(/(?<!\\)\t/g, "\\t")
@@ -229,9 +236,8 @@ export class CustomLLMProvider implements ILLMProvider {
           return JSON.parse(fixed);
         } catch {
           // Last resort: strip all control characters inside strings
-          const stripped = repaired.replace(
-            /"(?:[^"\\]|\\.)*"/g,
-            (match) => match.replace(/[\x00-\x1f]/g, " ")
+          const stripped = repaired.replace(/"(?:[^"\\]|\\.)*"/g, match =>
+            match.replace(/[\x00-\x1f]/g, " ")
           );
           return JSON.parse(stripped);
         }
@@ -271,7 +277,13 @@ export class CustomLLMProvider implements ILLMProvider {
             j++;
           }
           const next = j < text.length ? text[j]! : "";
-          if (next === ":" || next === "," || next === "}" || next === "]" || next === "") {
+          if (
+            next === ":" ||
+            next === "," ||
+            next === "}" ||
+            next === "]" ||
+            next === ""
+          ) {
             // Structural closing quote
             inString = false;
             result.push(ch);
@@ -323,7 +335,10 @@ export class CustomLLMProvider implements ILLMProvider {
 
   buildApiPayload(request: LLMRequest): Record<string, unknown> {
     // Build OpenAI-compatible payload with multimodal support
-    const messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [];
+    const messages: Array<{
+      role: string;
+      content: string | Array<Record<string, unknown>>;
+    }> = [];
 
     if (request.systemPrompt) {
       messages.push({ role: "system", content: request.systemPrompt });

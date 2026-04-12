@@ -57,7 +57,8 @@ export function createLLMProvider(
 export const PROVIDER_ENDPOINTS: Record<LlmProvider, string> = {
   openai: "https://api.openai.com/v1/chat/completions",
   anthropic: "https://api.anthropic.com/v1/messages",
-  gemini: "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+  gemini:
+    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
   mistral: "https://api.mistral.ai/v1/chat/completions",
   cohere: "https://api.cohere.ai/v1/chat",
   groq: "https://api.groq.com/openai/v1/chat/completions",

@@ -21,12 +21,18 @@ app.use("*", logger());
 app.use("*", cors());
 
 // Body size limit: 50MB to accommodate base64-encoded media payloads
-app.use("*", bodyLimit({
-  maxSize: 50 * 1024 * 1024, // 50 MB
-  onError: (c) => {
-    return c.json(errorResponse("Request body too large. Maximum size is 50MB."), 413);
-  },
-}));
+app.use(
+  "*",
+  bodyLimit({
+    maxSize: 50 * 1024 * 1024, // 50 MB
+    onError: c => {
+      return c.json(
+        errorResponse("Request body too large. Maximum size is 50MB."),
+        413
+      );
+    },
+  })
+);
 
 // Health check
 app.get("/", c => {

@@ -103,7 +103,7 @@ export class OpenAIProvider implements ILLMProvider {
       };
     }
 
-    const response = await this.client.chat.completions.create({
+    const response = (await this.client.chat.completions.create({
       model,
       messages,
       modalities,
@@ -116,12 +116,15 @@ export class OpenAIProvider implements ILLMProvider {
       temperature: request.temperature ?? 0,
       max_tokens: request.maxTokens,
       stream: false,
-    } as OpenAI.Chat.ChatCompletionCreateParams) as OpenAI.Chat.ChatCompletion;
+    } as OpenAI.Chat.ChatCompletionCreateParams)) as OpenAI.Chat.ChatCompletion;
 
     const latencyMs = Date.now() - startTime;
 
     // Extract audio from response if present
-    const message = response.choices[0]?.message as OpenAI.Chat.ChatCompletionMessage & { audio?: { data: string; format: string } };
+    const message = response.choices[0]
+      ?.message as OpenAI.Chat.ChatCompletionMessage & {
+      audio?: { data: string; format: string };
+    };
     const audioData = message?.audio;
     if (audioData) {
       const audioMimeType = `audio/${audioData.format}`;

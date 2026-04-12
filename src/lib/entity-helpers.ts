@@ -5,13 +5,7 @@
  * This eliminates duplication of entity config and permission checking.
  */
 
-import {
-  db,
-  entities,
-  entityMembers,
-  entityInvitations,
-  users,
-} from "../db";
+import { db, entities, entityMembers, entityInvitations, users } from "../db";
 import {
   createEntityHelpers,
   type InvitationHelperConfig,

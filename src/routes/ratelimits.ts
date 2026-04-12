@@ -6,16 +6,17 @@
 
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import {
-  successResponse,
-  errorResponse,
-} from "@sudobility/shapeshyft_types";
+import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
 import {
   RateLimitPeriodType,
-  type RateLimitsConfigResponse,
-  type RateLimitHistoryResponse,
+  type RateLimitsConfigData,
+  type RateLimitHistoryData,
 } from "@sudobility/types";
-import { getRateLimitRouteHandler, rateLimitsConfig, entitlementDisplayNames } from "../middleware/rateLimit";
+import {
+  getRateLimitRouteHandler,
+  rateLimitsConfig,
+  entitlementDisplayNames,
+} from "../middleware/rateLimit";
 import { getEnv } from "../lib/env-helper";
 import { db, entities, entityMembers } from "../db";
 
@@ -71,7 +72,9 @@ async function getEntityIdForRateLimits(
     .from(entityMembers)
     .where(eq(entityMembers.entity_id, entity.id));
 
-  const isMember = memberRows.some((m) => m.user_id === firebaseUid && m.is_active);
+  const isMember = memberRows.some(
+    m => m.user_id === firebaseUid && m.is_active
+  );
   if (!isMember) {
     return { entityId: null, error: "Access denied to entity" };
   }
@@ -96,16 +99,18 @@ ratelimitsRouter.get("/", async c => {
     if (!isRevenueCatConfigured()) {
       const noneLimits = rateLimitsConfig.none;
       // Convert flat config to tiers array format
-      const tiers = Object.entries(rateLimitsConfig).map(([entitlement, limits]) => ({
-        entitlement,
-        displayName: entitlementDisplayNames[entitlement] || entitlement,
-        limits: {
-          hourly: limits.hourly ?? null,
-          daily: limits.daily ?? null,
-          monthly: limits.monthly ?? null,
-        },
-      }));
-      return c.json(successResponse({
+      const tiers = Object.entries(rateLimitsConfig).map(
+        ([entitlement, limits]) => ({
+          entitlement,
+          displayName: entitlementDisplayNames[entitlement] || entitlement,
+          limits: {
+            hourly: limits.hourly ?? null,
+            daily: limits.daily ?? null,
+            monthly: limits.monthly ?? null,
+          },
+        })
+      );
+      const fallback: RateLimitsConfigData = {
         tiers,
         currentEntitlement: "none",
         currentLimits: {
@@ -118,7 +123,8 @@ ratelimitsRouter.get("/", async c => {
           daily: 0,
           monthly: 0,
         },
-      }));
+      };
+      return c.json(successResponse<RateLimitsConfigData>(fallback));
     }
 
     const firebaseUser = c.get("firebaseUser");
@@ -130,8 +136,12 @@ ratelimitsRouter.get("/", async c => {
     );
 
     if (entityError || !entityId) {
-      const status = entityError === "rateLimitUserId is required" ? 400 :
-                     entityError === "Access denied to entity" ? 403 : 404;
+      const status =
+        entityError === "rateLimitUserId is required"
+          ? 400
+          : entityError === "Access denied to entity"
+            ? 403
+            : 404;
       return c.json(errorResponse(entityError || "Entity not found"), status);
     }
 
@@ -142,7 +152,7 @@ ratelimitsRouter.get("/", async c => {
       testMode
     );
 
-    return c.json(successResponse(data) as RateLimitsConfigResponse);
+    return c.json(successResponse<RateLimitsConfigData>(data));
   } catch (error) {
     console.error("Error fetching rate limits config:", error);
     return c.json(errorResponse("Failed to fetch rate limits"), 500);
@@ -165,20 +175,19 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     // Validate period type
     if (!["hour", "day", "month"].includes(periodTypeParam)) {
       return c.json(
-        errorResponse(
-          "Invalid period type. Must be one of: hour, day, month"
-        ),
+        errorResponse("Invalid period type. Must be one of: hour, day, month"),
         400
       );
     }
 
     // If RevenueCat is not configured, return empty history
     if (!isRevenueCatConfigured()) {
-      return c.json(successResponse({
+      const emptyHistory: RateLimitHistoryData = {
         periodType: periodTypeParam as RateLimitPeriodType,
         entries: [],
         totalEntries: 0,
-      }));
+      };
+      return c.json(successResponse<RateLimitHistoryData>(emptyHistory));
     }
 
     const periodType = periodTypeParam as RateLimitPeriodType;
@@ -191,8 +200,12 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     );
 
     if (entityError || !entityId) {
-      const status = entityError === "rateLimitUserId is required" ? 400 :
-                     entityError === "Access denied to entity" ? 403 : 404;
+      const status =
+        entityError === "rateLimitUserId is required"
+          ? 400
+          : entityError === "Access denied to entity"
+            ? 403
+            : 404;
       return c.json(errorResponse(entityError || "Entity not found"), status);
     }
 
@@ -205,7 +218,7 @@ ratelimitsRouter.get("/history/:periodType", async c => {
       testMode
     );
 
-    return c.json(successResponse(data) as RateLimitHistoryResponse);
+    return c.json(successResponse<RateLimitHistoryData>(data));
   } catch (error) {
     console.error("Error fetching rate limit history:", error);
     return c.json(errorResponse("Failed to fetch rate limit history"), 500);

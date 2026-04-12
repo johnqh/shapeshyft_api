@@ -2,7 +2,13 @@
  * Model capability validation for multimodal requests.
  */
 
-import type { MediaContent, MediaType, MediaFormatSupport, MediaInputFormat, LlmProvider } from "@sudobility/shapeshyft_types";
+import type {
+  MediaContent,
+  MediaType,
+  MediaFormatSupport,
+  MediaInputFormat,
+  LlmProvider,
+} from "@sudobility/shapeshyft_types";
 import { getModelCapabilities } from "../config/providers";
 import {
   isAllowedMimeType,
@@ -86,7 +92,12 @@ export function validateMediaCapabilities(
 
     // 2. Check format support (base64 vs url)
     const formats = getMediaFormats(caps.mediaFormats, media.type);
-    if (formats.length > 0 && !formats.includes(media.format as "base64" | "url" | "gcs" | "s3" | "file")) {
+    if (
+      formats.length > 0 &&
+      !formats.includes(
+        media.format as "base64" | "url" | "gcs" | "s3" | "file"
+      )
+    ) {
       errors.push(
         `Model ${ctx.model} does not support ${media.format} format for ${media.type}`
       );
@@ -165,7 +176,7 @@ export function validateWhisperRequest(
   }
 
   // Whisper requires exactly one audio input
-  const audioInputs = inputMedia.filter((m) => m.type === "audio");
+  const audioInputs = inputMedia.filter(m => m.type === "audio");
 
   if (audioInputs.length === 0) {
     errors.push("Whisper models require exactly one audio input");
@@ -177,7 +188,7 @@ export function validateWhisperRequest(
   }
 
   // Whisper doesn't accept other media types
-  const nonAudioInputs = inputMedia.filter((m) => m.type !== "audio");
+  const nonAudioInputs = inputMedia.filter(m => m.type !== "audio");
   if (nonAudioInputs.length > 0) {
     errors.push("Whisper models only accept audio input, not images or video");
   }

@@ -27,9 +27,15 @@ export function schemaToPromptInstructions(
       const reqMarker = isRequired ? "(required)" : "(optional)";
 
       // Handle map type (x-map with additionalProperties)
-      if ((prop as Record<string, unknown>)["x-map"] && prop.additionalProperties && typeof prop.additionalProperties === "object") {
+      if (
+        (prop as Record<string, unknown>)["x-map"] &&
+        prop.additionalProperties &&
+        typeof prop.additionalProperties === "object"
+      ) {
         const valueProp = prop.additionalProperties as JsonSchema;
-        const keyDesc = (prop as Record<string, unknown>)["x-key-description"] as string | undefined;
+        const keyDesc = (prop as Record<string, unknown>)[
+          "x-key-description"
+        ] as string | undefined;
         const valueType = valueProp.type ?? "any";
         const valueDesc = valueProp.description ?? "";
         const propDesc = prop.description ?? "";
@@ -37,9 +43,7 @@ export function schemaToPromptInstructions(
         lines.push(
           `${indent}- \`${propName}\` (map) ${reqMarker}: ${propDesc}`
         );
-        lines.push(
-          `${indent}  Key: string${keyDesc ? ` — ${keyDesc}` : ""}`
-        );
+        lines.push(`${indent}  Key: string${keyDesc ? ` — ${keyDesc}` : ""}`);
         lines.push(
           `${indent}  Value: ${valueType}${valueDesc ? ` — ${valueDesc}` : ""}`
         );
@@ -120,10 +124,23 @@ export function generateSchemaExample(schema: JsonSchema): unknown {
   if (schema.enum && schema.enum.length > 0) return schema.enum[0];
 
   // Map type: object with x-map and additionalProperties
-  if (schemaType === "object" && (schema as Record<string, unknown>)["x-map"] && schema.additionalProperties && typeof schema.additionalProperties === "object") {
-    const keyDesc = (schema as Record<string, unknown>)["x-key-description"] as string | undefined;
-    const sampleKey = keyDesc ? `<${keyDesc.split(/[\s(,]/)[0].toLowerCase()}>` : "<key>";
-    return { [sampleKey]: generateSchemaExample(schema.additionalProperties as JsonSchema) };
+  if (
+    schemaType === "object" &&
+    (schema as Record<string, unknown>)["x-map"] &&
+    schema.additionalProperties &&
+    typeof schema.additionalProperties === "object"
+  ) {
+    const keyDesc = (schema as Record<string, unknown>)["x-key-description"] as
+      | string
+      | undefined;
+    const sampleKey = keyDesc
+      ? `<${keyDesc.split(/[\s(,]/)[0].toLowerCase()}>`
+      : "<key>";
+    return {
+      [sampleKey]: generateSchemaExample(
+        schema.additionalProperties as JsonSchema
+      ),
+    };
   }
 
   if (schemaType === "object" && schema.properties) {
@@ -165,7 +182,11 @@ export function isComplexSchema(schema: JsonSchema): boolean {
   if (properties.length > 3) return true;
   return properties.some(p => {
     const prop = p as JsonSchema;
-    return prop.type === "object" || prop.type === "array" || (prop as Record<string, unknown>)["x-map"];
+    return (
+      prop.type === "object" ||
+      prop.type === "array" ||
+      (prop as Record<string, unknown>)["x-map"]
+    );
   });
 }
 
@@ -207,7 +228,7 @@ export function buildSystemPrompt(
   // JSON instruction
   parts.push(
     "\n## Response Format\nRespond with valid JSON only. Do not include any text outside the JSON object. " +
-    "IMPORTANT: All string values must use proper JSON escaping — use \\\" for double quotes, \\n for newlines, \\\\ for backslashes."
+      'IMPORTANT: All string values must use proper JSON escaping — use \\" for double quotes, \\n for newlines, \\\\ for backslashes.'
   );
 
   return parts.join("\n");
@@ -290,81 +311,104 @@ export interface ProviderPromptConfig {
 /**
  * Get provider-specific prompt configuration
  */
-export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptConfig {
+export function getProviderPromptConfig(
+  provider: LlmProvider
+): ProviderPromptConfig {
   switch (provider) {
     case "openai":
       return {
-        baseInstruction: "You are a helpful assistant that produces structured data output.",
-        jsonInstruction: "Respond with valid JSON only. Do not include any text outside the JSON object.",
+        baseInstruction:
+          "You are a helpful assistant that produces structured data output.",
+        jsonInstruction:
+          "Respond with valid JSON only. Do not include any text outside the JSON object.",
         includeExample: true,
         verboseSchema: false,
       };
 
     case "anthropic":
       return {
-        baseInstruction: "You are Claude, an AI assistant. Your task is to analyze the input and produce structured data output.",
-        jsonInstruction: "Output valid JSON only. Do not include markdown code blocks, explanations, or any text outside the JSON object.",
+        baseInstruction:
+          "You are Claude, an AI assistant. Your task is to analyze the input and produce structured data output.",
+        jsonInstruction:
+          "Output valid JSON only. Do not include markdown code blocks, explanations, or any text outside the JSON object.",
         includeExample: true,
         verboseSchema: true,
-        additionalInstructions: "Think step by step about the data structure before generating output.",
+        additionalInstructions:
+          "Think step by step about the data structure before generating output.",
       };
 
     case "gemini":
       return {
-        baseInstruction: "You are a helpful assistant that produces structured JSON data.",
-        jsonInstruction: "Return only valid JSON matching the specified schema.",
+        baseInstruction:
+          "You are a helpful assistant that produces structured JSON data.",
+        jsonInstruction:
+          "Return only valid JSON matching the specified schema.",
         includeExample: false, // Gemini uses responseSchema natively
         verboseSchema: false,
       };
 
     case "mistral":
       return {
-        baseInstruction: "You are a helpful assistant specialized in producing structured data output.",
-        jsonInstruction: "Respond with valid JSON only. No markdown, no explanations, just the JSON object. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
+        baseInstruction:
+          "You are a helpful assistant specialized in producing structured data output.",
+        jsonInstruction:
+          'Respond with valid JSON only. No markdown, no explanations, just the JSON object. Use proper JSON escaping in strings — \\" for double quotes, \\n for newlines.',
         includeExample: true,
         verboseSchema: false,
       };
 
     case "cohere":
       return {
-        baseInstruction: "You are a helpful assistant that generates structured data responses.",
-        jsonInstruction: "Output valid JSON only. Do not include any text, markdown, or explanations outside the JSON. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
+        baseInstruction:
+          "You are a helpful assistant that generates structured data responses.",
+        jsonInstruction:
+          'Output valid JSON only. Do not include any text, markdown, or explanations outside the JSON. Use proper JSON escaping in strings — \\" for double quotes, \\n for newlines.',
         includeExample: true,
         verboseSchema: true,
       };
 
     case "groq":
       return {
-        baseInstruction: "You are a fast, efficient assistant that produces structured data.",
-        jsonInstruction: "Respond with valid JSON only. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
+        baseInstruction:
+          "You are a fast, efficient assistant that produces structured data.",
+        jsonInstruction:
+          'Respond with valid JSON only. Use proper JSON escaping in strings — \\" for double quotes, \\n for newlines.',
         includeExample: true,
         verboseSchema: false,
       };
 
     case "xai":
       return {
-        baseInstruction: "You are Grok, an AI assistant. Generate structured data output based on the given input.",
-        jsonInstruction: "Return valid JSON only. No additional text or formatting. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
+        baseInstruction:
+          "You are Grok, an AI assistant. Generate structured data output based on the given input.",
+        jsonInstruction:
+          'Return valid JSON only. No additional text or formatting. Use proper JSON escaping in strings — \\" for double quotes, \\n for newlines.',
         includeExample: true,
         verboseSchema: true,
       };
 
     case "deepseek":
       return {
-        baseInstruction: "You are a helpful assistant that produces structured JSON output.",
-        jsonInstruction: "Respond with valid JSON only. Do not include markdown code blocks or any text outside the JSON. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
+        baseInstruction:
+          "You are a helpful assistant that produces structured JSON output.",
+        jsonInstruction:
+          'Respond with valid JSON only. Do not include markdown code blocks or any text outside the JSON. Use proper JSON escaping in strings — \\" for double quotes, \\n for newlines.',
         includeExample: true,
         verboseSchema: true,
-        additionalInstructions: "Analyze the input carefully before generating the structured response.",
+        additionalInstructions:
+          "Analyze the input carefully before generating the structured response.",
       };
 
     case "perplexity":
       return {
-        baseInstruction: "You are a helpful assistant that produces structured data output based on available information.",
-        jsonInstruction: "Output valid JSON only. No citations, no explanations, just the JSON object. Use proper JSON escaping in strings — \\\" for double quotes, \\n for newlines.",
+        baseInstruction:
+          "You are a helpful assistant that produces structured data output based on available information.",
+        jsonInstruction:
+          'Output valid JSON only. No citations, no explanations, just the JSON object. Use proper JSON escaping in strings — \\" for double quotes, \\n for newlines.',
         includeExample: true,
         verboseSchema: false,
-        additionalInstructions: "Focus on the specific data requested, not general information.",
+        additionalInstructions:
+          "Focus on the specific data requested, not general information.",
       };
 
     case "lm_studio":
@@ -379,7 +423,7 @@ export function getProviderPromptConfig(provider: LlmProvider): ProviderPromptCo
         jsonInstruction:
           "Respond with valid JSON only. Do not include any text, markdown code blocks, or thinking outside the JSON object. " +
           "IMPORTANT: All string values in the JSON must use proper JSON escaping. " +
-          "Use \\\" for double quotes, \\n for newlines, \\t for tabs, and \\\\ for backslashes inside string values. " +
+          'Use \\" for double quotes, \\n for newlines, \\t for tabs, and \\\\ for backslashes inside string values. ' +
           "Do not put literal newlines or unescaped special characters inside JSON strings.",
         includeExample: true,
         verboseSchema: false,
@@ -444,7 +488,11 @@ export function buildPromptsForProvider(
   provider: LlmProvider
 ): { system: string; user: string } {
   return {
-    system: buildSystemPromptForProvider(userDescription, outputSchema, provider),
+    system: buildSystemPromptForProvider(
+      userDescription,
+      outputSchema,
+      provider
+    ),
     user: buildUserPrompt(inputData, isStructuredInput),
   };
 }

@@ -76,11 +76,11 @@ settingsRouter.get("/", async c => {
       created_at: null,
       updated_at: null,
     };
-    return c.json(successResponse(defaultSettings));
+    return c.json(successResponse<UserSettings>(defaultSettings));
   }
 
   const settings: UserSettings = { ...rows[0], is_default: false };
-  return c.json(successResponse(settings));
+  return c.json(successResponse<UserSettings>(settings));
 });
 
 // PUT create/update settings (upsert)
@@ -110,7 +110,8 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
 
     if (
       duplicate.length > 0 &&
-      (existing.length === 0 || duplicate[0]!.firebase_uid !== user.firebase_uid)
+      (existing.length === 0 ||
+        duplicate[0]!.firebase_uid !== user.firebase_uid)
     ) {
       return c.json(errorResponse("Organization path already taken"), 409);
     }
@@ -118,7 +119,8 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
 
   if (existing.length === 0) {
     // Create new settings
-    const orgPath = body.organization_path || generateDefaultOrgPath(user.firebase_uid);
+    const orgPath =
+      body.organization_path || generateDefaultOrgPath(user.firebase_uid);
 
     // Double-check the auto-generated path isn't taken
     if (!body.organization_path) {
@@ -147,7 +149,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
       .returning();
 
     const created: UserSettings = { ...rows[0]!, is_default: false };
-    return c.json(successResponse(created), 201);
+    return c.json(successResponse<UserSettings>(created), 201);
   }
 
   // Update existing settings
@@ -163,7 +165,7 @@ settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
     .returning();
 
   const updated: UserSettings = { ...rows[0]!, is_default: false };
-  return c.json(successResponse(updated));
+  return c.json(successResponse<UserSettings>(updated));
 });
 
 export default settingsRouter;

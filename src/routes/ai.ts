@@ -25,6 +25,8 @@ import {
   successResponse,
   errorResponse,
   type JsonSchema,
+  type AiExecutionResponse,
+  type AiPromptResponse,
 } from "@sudobility/shapeshyft_types";
 import { decryptApiKey } from "../lib/encryption";
 import { ApiHelper } from "../lib/api-helper";
@@ -34,10 +36,7 @@ import {
   getModelPricing,
   type LLMRequest,
 } from "../services/llm";
-import {
-  validateProjectApiKey,
-  isValidApiKeyFormat,
-} from "../lib/api-key";
+import { validateProjectApiKey, isValidApiKeyFormat } from "../lib/api-key";
 import { getEnv } from "../lib/env-helper";
 import {
   EntitlementHelper,
@@ -123,7 +122,10 @@ function getClientIp(c: any): string | null {
 /**
  * Check if IP is in the allowlist
  */
-function isIpAllowed(clientIp: string | null, allowlist: string[] | null): boolean {
+function isIpAllowed(
+  clientIp: string | null,
+  allowlist: string[] | null
+): boolean {
   // If no allowlist is set, allow all
   if (!allowlist || allowlist.length === 0) {
     return true;
@@ -188,7 +190,6 @@ async function findEntityBySlug(
 
   return entityRows[0] ?? null;
 }
-
 
 // Lazy-initialized rate limit helpers
 let _subscriptionHelper: SubscriptionHelper | null = null;
@@ -299,8 +300,13 @@ async function checkRateLimit(
   try {
     // Use entityId as RevenueCat subscriber ID
     // testMode is passed to filter sandbox purchases in production mode
-    const subscriptionInfo = await subHelper.getSubscriptionInfo(entity.id, testMode);
-    const limits = getEntitlementHelper().getRateLimits(subscriptionInfo.entitlements);
+    const subscriptionInfo = await subHelper.getSubscriptionInfo(
+      entity.id,
+      testMode
+    );
+    const limits = getEntitlementHelper().getRateLimits(
+      subscriptionInfo.entitlements
+    );
     const result = await getRateLimitChecker().checkAndIncrement(
       entity.id,
       limits,
@@ -311,9 +317,9 @@ async function checkRateLimit(
       return c.json(
         errorResponse(
           `Rate limit exceeded (${result.exceededLimit ?? "unknown"} limit). ` +
-          `Remaining: hourly=${result.remaining.hourly ?? "∞"}, ` +
-          `daily=${result.remaining.daily ?? "∞"}, ` +
-          `monthly=${result.remaining.monthly ?? "∞"}`
+            `Remaining: hourly=${result.remaining.hourly ?? "∞"}, ` +
+            `daily=${result.remaining.daily ?? "∞"}, ` +
+            `monthly=${result.remaining.monthly ?? "∞"}`
         ),
         429
       );
@@ -369,7 +375,9 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
     return {
       success: false,
       response: c.json(
-        errorResponse("API key required. Provide via api_key query parameter or Authorization header"),
+        errorResponse(
+          "API key required. Provide via api_key query parameter or Authorization header"
+        ),
         401
       ),
     };
@@ -386,10 +394,7 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
   if (!project.encrypted_api_key || !project.api_key_iv) {
     return {
       success: false,
-      response: c.json(
-        errorResponse("Project API key not configured"),
-        500
-      ),
+      response: c.json(errorResponse("Project API key not configured"), 500),
     };
   }
 
@@ -435,7 +440,9 @@ async function validateAndGetContext(c: any): Promise<ValidationResult> {
       return {
         success: false,
         response: c.json(
-          errorResponse(`IP address ${clientIp ?? "unknown"} is not allowed to access this endpoint`),
+          errorResponse(
+            `IP address ${clientIp ?? "unknown"} is not allowed to access this endpoint`
+          ),
           403
         ),
       };
@@ -537,11 +544,8 @@ async function handlePromptRequest(c: any) {
     provider: llmKey.provider,
   });
 
-  return c.json(
-    successResponse({
-      prompt,
-    })
-  );
+  const promptResponse: AiPromptResponse = { prompt };
+  return c.json(successResponse<AiPromptResponse>(promptResponse));
 }
 
 // =============================================================================
@@ -653,7 +657,11 @@ async function handleAIRequest(c: any) {
 
   const llmRequest: LLMRequest =
     endpoint.output_media_format === "url"
-      ? { ...baseRequest, outputMediaFormat: "url" as const, entityId: endpoint.uuid }
+      ? {
+          ...baseRequest,
+          outputMediaFormat: "url" as const,
+          entityId: endpoint.uuid,
+        }
       : { ...baseRequest, outputMediaFormat: "base64" as const };
 
   // 4. Call LLM and return response
@@ -705,20 +713,7 @@ async function handleAIRequest(c: any) {
     });
 
     // 7. Return response with generated media if present
-    const response: {
-      output: unknown;
-      usage: {
-        tokens_input: number;
-        tokens_output: number;
-        latency_ms: number;
-        estimated_cost_cents: number;
-      };
-      generated_media?: Array<{
-        type: string;
-        mimeType: string;
-        data: string;
-      }>;
-    } = {
+    const response: AiExecutionResponse = {
       output: llmResponse.content,
       usage: {
         tokens_input: llmResponse.usage.promptTokens,
@@ -733,7 +728,7 @@ async function handleAIRequest(c: any) {
       response.generated_media = llmResponse.generatedMedia;
     }
 
-    return c.json(successResponse(response));
+    return c.json(successResponse<AiExecutionResponse>(response));
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
@@ -747,15 +742,8 @@ async function handleAIRequest(c: any) {
       latency_ms: latencyMs,
     });
 
-    return c.json(
-      {
-        success: false,
-        error: `LLM processing failed: ${errorMessage}`,
-        debug: debugInfo,
-        timestamp: new Date().toISOString(),
-      },
-      500
-    );
+    console.error("LLM processing failed:", errorMessage, debugInfo);
+    return c.json(errorResponse(`LLM processing failed: ${errorMessage}`), 500);
   }
 }
 

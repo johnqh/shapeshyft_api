@@ -14,8 +14,15 @@ import {
   endpointIdParamSchema,
   projectIdParamSchema,
 } from "../schemas";
-import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
-import { getEntityWithPermission, getPermissionErrorStatus } from "../lib/entity-helpers";
+import {
+  successResponse,
+  errorResponse,
+  type Endpoint,
+} from "@sudobility/shapeshyft_types";
+import {
+  getEntityWithPermission,
+  getPermissionErrorStatus,
+} from "../lib/entity-helpers";
 
 const endpointsRouter = new Hono();
 
@@ -44,36 +51,35 @@ async function verifyKeyOwnership(entityId: string, keyId: string) {
 }
 
 // GET all endpoints for project
-endpointsRouter.get(
-  "/",
-  zValidator("param", projectIdParamSchema),
-  async c => {
-    try {
-      const userId = c.get("userId");
-      const { entitySlug, projectId } = c.req.valid("param");
+endpointsRouter.get("/", zValidator("param", projectIdParamSchema), async c => {
+  try {
+    const userId = c.get("userId");
+    const { entitySlug, projectId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
-      }
-
-      const project = await verifyProjectOwnership(result.entity.id, projectId);
-      if (!project) {
-        return c.json(errorResponse("Project not found"), 404);
-      }
-
-      const rows = await db
-        .select()
-        .from(endpoints)
-        .where(eq(endpoints.project_id, projectId));
-
-      return c.json(successResponse(rows));
-    } catch (error: any) {
-      console.error("Error getting endpoints:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error !== undefined) {
+      return c.json(
+        errorResponse(result.error),
+        getPermissionErrorStatus(result.errorCode)
+      );
     }
+
+    const project = await verifyProjectOwnership(result.entity.id, projectId);
+    if (!project) {
+      return c.json(errorResponse("Project not found"), 404);
+    }
+
+    const rows = await db
+      .select()
+      .from(endpoints)
+      .where(eq(endpoints.project_id, projectId));
+
+    return c.json(successResponse<Endpoint[]>(rows as Endpoint[]));
+  } catch (error: any) {
+    console.error("Error getting endpoints:", error);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
-);
+});
 
 // GET single endpoint
 endpointsRouter.get(
@@ -86,7 +92,10 @@ endpointsRouter.get(
 
       const result = await getEntityWithPermission(entitySlug, userId);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);
@@ -98,17 +107,23 @@ endpointsRouter.get(
         .select()
         .from(endpoints)
         .where(
-          and(eq(endpoints.project_id, projectId), eq(endpoints.uuid, endpointId))
+          and(
+            eq(endpoints.project_id, projectId),
+            eq(endpoints.uuid, endpointId)
+          )
         );
 
       if (rows.length === 0) {
         return c.json(errorResponse("Endpoint not found"), 404);
       }
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Endpoint>(rows[0] as Endpoint));
     } catch (error: any) {
       console.error("Error getting endpoint:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -126,7 +141,10 @@ endpointsRouter.post(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);
@@ -135,7 +153,10 @@ endpointsRouter.post(
       }
 
       // Verify LLM key belongs to entity
-      const llmKey = await verifyKeyOwnership(result.entity.id, body.llm_key_id);
+      const llmKey = await verifyKeyOwnership(
+        result.entity.id,
+        body.llm_key_id
+      );
       if (!llmKey) {
         return c.json(
           errorResponse("LLM key not found or doesn't belong to this entity"),
@@ -176,13 +197,18 @@ endpointsRouter.post(
           context: body.context ?? null,
           expects_media_output: body.expects_media_output ?? null,
           output_media_format: body.output_media_format ?? null,
+          transcription_extraction_model:
+            body.transcription_extraction_model ?? null,
         })
         .returning();
 
-      return c.json(successResponse(rows[0]), 201);
+      return c.json(successResponse<Endpoint>(rows[0] as Endpoint), 201);
     } catch (error: any) {
       console.error("Error creating endpoint:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -200,7 +226,10 @@ endpointsRouter.put(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);
@@ -213,7 +242,10 @@ endpointsRouter.put(
         .select()
         .from(endpoints)
         .where(
-          and(eq(endpoints.project_id, projectId), eq(endpoints.uuid, endpointId))
+          and(
+            eq(endpoints.project_id, projectId),
+            eq(endpoints.uuid, endpointId)
+          )
         );
 
       if (existing.length === 0) {
@@ -224,7 +256,10 @@ endpointsRouter.put(
 
       // If changing LLM key, verify it belongs to entity
       if (body.llm_key_id && body.llm_key_id !== current.llm_key_id) {
-        const llmKey = await verifyKeyOwnership(result.entity.id, body.llm_key_id);
+        const llmKey = await verifyKeyOwnership(
+          result.entity.id,
+          body.llm_key_id
+        );
         if (!llmKey) {
           return c.json(
             errorResponse("LLM key not found or doesn't belong to this entity"),
@@ -254,7 +289,10 @@ endpointsRouter.put(
       }
 
       // Helper to handle nullable fields - null means clear, undefined means keep current
-      const handleNullable = <T>(value: T | null | undefined, current: T | null): T | null => {
+      const handleNullable = <T>(
+        value: T | null | undefined,
+        current: T | null
+      ): T | null => {
         if (value === null) return null;
         if (value !== undefined) return value;
         return current;
@@ -269,7 +307,10 @@ endpointsRouter.put(
           llm_key_id: body.llm_key_id ?? current.llm_key_id,
           model: handleNullable(body.model, current.model),
           input_schema: handleNullable(body.input_schema, current.input_schema),
-          output_schema: handleNullable(body.output_schema, current.output_schema),
+          output_schema: handleNullable(
+            body.output_schema,
+            current.output_schema
+          ),
           instructions: handleNullable(body.instructions, current.instructions),
           context: handleNullable(body.context, current.context),
           is_active: body.is_active ?? current.is_active,
@@ -282,15 +323,22 @@ endpointsRouter.put(
             body.output_media_format,
             current.output_media_format
           ),
+          transcription_extraction_model: handleNullable(
+            body.transcription_extraction_model,
+            current.transcription_extraction_model
+          ),
           updated_at: new Date(),
         })
         .where(eq(endpoints.uuid, endpointId))
         .returning();
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Endpoint>(rows[0] as Endpoint));
     } catch (error: any) {
       console.error("Error updating endpoint:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );
@@ -306,7 +354,10 @@ endpointsRouter.delete(
 
       const result = await getEntityWithPermission(entitySlug, userId, true);
       if (result.error !== undefined) {
-        return c.json(errorResponse(result.error), getPermissionErrorStatus(result.errorCode));
+        return c.json(
+          errorResponse(result.error),
+          getPermissionErrorStatus(result.errorCode)
+        );
       }
 
       const project = await verifyProjectOwnership(result.entity.id, projectId);
@@ -317,7 +368,10 @@ endpointsRouter.delete(
       const rows = await db
         .delete(endpoints)
         .where(
-          and(eq(endpoints.project_id, projectId), eq(endpoints.uuid, endpointId))
+          and(
+            eq(endpoints.project_id, projectId),
+            eq(endpoints.uuid, endpointId)
+          )
         )
         .returning();
 
@@ -325,10 +379,13 @@ endpointsRouter.delete(
         return c.json(errorResponse("Endpoint not found"), 404);
       }
 
-      return c.json(successResponse(rows[0]));
+      return c.json(successResponse<Endpoint>(rows[0] as Endpoint));
     } catch (error: any) {
       console.error("Error deleting endpoint:", error);
-      return c.json(errorResponse(error.message || "Internal server error"), 500);
+      return c.json(
+        errorResponse(error.message || "Internal server error"),
+        500
+      );
     }
   }
 );

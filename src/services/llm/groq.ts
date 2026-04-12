@@ -48,7 +48,9 @@ async function base64ToUploadable(
 
   // Determine file extension from MIME type
   const extension = mimeType.split("/")[1] ?? "mp3";
-  const filename = fieldName ? `${fieldName}.${extension}` : `audio.${extension}`;
+  const filename = fieldName
+    ? `${fieldName}.${extension}`
+    : `audio.${extension}`;
 
   // Use Groq SDK's toFile utility to create a proper Uploadable
   return toFile(bytes, filename, { type: mimeType });
@@ -108,7 +110,11 @@ export class GroqProvider implements ILLMProvider {
     // Convert base64 to Uploadable for SDK
     let audioFile: Awaited<ReturnType<typeof toFile>>;
     try {
-      audioFile = await base64ToUploadable(audio.data, audio.mimeType, audio.fieldName);
+      audioFile = await base64ToUploadable(
+        audio.data,
+        audio.mimeType,
+        audio.fieldName
+      );
     } catch (error) {
       throw new Error(
         `Invalid audio data: ${error instanceof Error ? error.message : error}`
@@ -163,7 +169,8 @@ export class GroqProvider implements ILLMProvider {
       maxTokens: request.maxTokens,
     };
 
-    const extractionResponse = await extractionProvider.generate(extractionRequest);
+    const extractionResponse =
+      await extractionProvider.generate(extractionRequest);
 
     // Combine latency from both steps
     return {

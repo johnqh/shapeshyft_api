@@ -7,10 +7,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
-import {
-  db,
-  entityStorageConfigs,
-} from "../db";
+import { db, entityStorageConfigs } from "../db";
 import {
   storageConfigCreateSchema,
   storageConfigUpdateSchema,
@@ -22,7 +19,10 @@ import {
   type EntityStorageConfig,
 } from "@sudobility/shapeshyft_types";
 import { encryptApiKey } from "../lib/encryption";
-import { getEntityWithPermission, getPermissionErrorStatus } from "../lib/entity-helpers";
+import {
+  getEntityWithPermission,
+  getPermissionErrorStatus,
+} from "../lib/entity-helpers";
 
 const storageRouter = new Hono();
 
@@ -44,41 +44,34 @@ function toSafeConfig(
 }
 
 // GET storage config for entity
-storageRouter.get(
-  "/",
-  zValidator("param", entitySlugParamSchema),
-  async c => {
-    try {
-      const userId = c.get("userId");
-      const { entitySlug } = c.req.valid("param");
+storageRouter.get("/", zValidator("param", entitySlugParamSchema), async c => {
+  try {
+    const userId = c.get("userId");
+    const { entitySlug } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
-      if (result.error !== undefined) {
-        return c.json(
-          errorResponse(result.error),
-          getPermissionErrorStatus(result.errorCode)
-        );
-      }
-
-      const rows = await db
-        .select()
-        .from(entityStorageConfigs)
-        .where(eq(entityStorageConfigs.entity_id, result.entity.id));
-
-      if (rows.length === 0) {
-        return c.json(errorResponse("Storage configuration not found"), 404);
-      }
-
-      return c.json(successResponse(toSafeConfig(rows[0]!)));
-    } catch (error: any) {
-      console.error("Error getting storage config:", error);
+    const result = await getEntityWithPermission(entitySlug, userId);
+    if (result.error !== undefined) {
       return c.json(
-        errorResponse(error.message || "Internal server error"),
-        500
+        errorResponse(result.error),
+        getPermissionErrorStatus(result.errorCode)
       );
     }
+
+    const rows = await db
+      .select()
+      .from(entityStorageConfigs)
+      .where(eq(entityStorageConfigs.entity_id, result.entity.id));
+
+    if (rows.length === 0) {
+      return c.json(errorResponse("Storage configuration not found"), 404);
+    }
+
+    return c.json(successResponse<EntityStorageConfig>(toSafeConfig(rows[0]!)));
+  } catch (error: any) {
+    console.error("Error getting storage config:", error);
+    return c.json(errorResponse(error.message || "Internal server error"), 500);
   }
-);
+});
 
 // POST create or update storage config (upsert)
 storageRouter.post(
@@ -141,7 +134,7 @@ storageRouter.post(
       }
 
       return c.json(
-        successResponse(toSafeConfig(rows[0]!)),
+        successResponse<EntityStorageConfig>(toSafeConfig(rows[0]!)),
         existing.length > 0 ? 200 : 201
       );
     } catch (error: any) {
@@ -211,7 +204,9 @@ storageRouter.put(
         .where(eq(entityStorageConfigs.entity_id, result.entity.id))
         .returning();
 
-      return c.json(successResponse(toSafeConfig(rows[0]!)));
+      return c.json(
+        successResponse<EntityStorageConfig>(toSafeConfig(rows[0]!))
+      );
     } catch (error: any) {
       console.error("Error updating storage config:", error);
       return c.json(
@@ -248,7 +243,9 @@ storageRouter.delete(
         return c.json(errorResponse("Storage configuration not found"), 404);
       }
 
-      return c.json(successResponse(toSafeConfig(rows[0]!)));
+      return c.json(
+        successResponse<EntityStorageConfig>(toSafeConfig(rows[0]!))
+      );
     } catch (error: any) {
       console.error("Error deleting storage config:", error);
       return c.json(

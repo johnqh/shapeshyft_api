@@ -300,7 +300,10 @@ export const storageConfigCreateSchema = z
     data => {
       // Validate credentials match provider
       if (data.provider === "gcs") {
-        return "type" in data.credentials && data.credentials.type === "service_account";
+        return (
+          "type" in data.credentials &&
+          data.credentials.type === "service_account"
+        );
       } else {
         return "access_key_id" in data.credentials;
       }

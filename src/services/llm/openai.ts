@@ -229,9 +229,12 @@ export class OpenAIProvider implements ILLMProvider {
       model,
       input,
       tools,
+      tool_choice: {
+        type: "function",
+        name: "structured_response",
+      },
       temperature: request.temperature ?? 0,
       max_output_tokens: request.maxTokens,
-      stream: false,
     });
 
     const latencyMs = Date.now() - startTime;

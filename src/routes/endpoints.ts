@@ -197,6 +197,7 @@ endpointsRouter.post(
           context: body.context ?? null,
           expects_media_output: body.expects_media_output ?? null,
           output_media_format: body.output_media_format ?? null,
+          web_search: body.web_search ?? false,
           transcription_extraction_model:
             body.transcription_extraction_model ?? null,
         })
@@ -323,6 +324,7 @@ endpointsRouter.put(
             body.output_media_format,
             current.output_media_format
           ),
+          web_search: body.web_search ?? current.web_search,
           transcription_extraction_model: handleNullable(
             body.transcription_extraction_model,
             current.transcription_extraction_model

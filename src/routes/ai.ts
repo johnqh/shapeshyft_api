@@ -653,6 +653,7 @@ async function handleAIRequest(c: any) {
     model,
     media: media.length > 0 ? media : undefined,
     expectsMediaOutput: expectsMediaOutput ?? undefined,
+    webSearch: endpoint.web_search ?? false,
   };
 
   const llmRequest: LLMRequest =

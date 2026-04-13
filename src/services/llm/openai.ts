@@ -34,6 +34,11 @@ export class OpenAIProvider implements ILLMProvider {
   }
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
+    // Use Responses API when web search is enabled
+    if (request.webSearch) {
+      return this.generateWithSearch(request);
+    }
+
     const model = request.model ?? this.defaultModel;
     const startTime = Date.now();
     const caps = getModelCapabilities(model);
@@ -106,8 +111,7 @@ export class OpenAIProvider implements ILLMProvider {
     const response = (await this.client.chat.completions.create({
       model,
       messages,
-      modalities,
-      audio: audioConfig,
+      ...(audioConfig ? { modalities, audio: audioConfig } : {}),
       tools,
       tool_choice: {
         type: "function",
@@ -174,6 +178,95 @@ export class OpenAIProvider implements ILLMProvider {
     };
   }
 
+  /**
+   * Generate using the OpenAI Responses API with web search enabled.
+   * The model can search the web and then call the structured_response function.
+   */
+  private async generateWithSearch(request: LLMRequest): Promise<LLMResponse> {
+    const model = request.model ?? this.defaultModel;
+    const startTime = Date.now();
+
+    // Build input messages
+    const input: OpenAI.Responses.ResponseInputItem[] = [];
+    if (request.systemPrompt) {
+      input.push({
+        role: "developer" as const,
+        content: request.systemPrompt,
+      });
+    }
+
+    // Build user content (text + optional media)
+    const userContent: OpenAI.Responses.ResponseInputContent[] = [];
+    if (request.media?.length) {
+      for (const m of request.media) {
+        if (m.type === "image") {
+          userContent.push({
+            type: "input_image",
+            image_url:
+              m.format === "base64"
+                ? `data:${m.mimeType};base64,${m.data}`
+                : m.data,
+            detail: "auto",
+          });
+        }
+      }
+    }
+    userContent.push({ type: "input_text", text: request.prompt });
+    input.push({ role: "user" as const, content: userContent });
+
+    const tools: OpenAI.Responses.Tool[] = [
+      { type: "web_search_preview" },
+      {
+        type: "function",
+        name: "structured_response",
+        description: "Generate structured response matching the schema",
+        parameters: request.outputSchema as Record<string, unknown>,
+        strict: false,
+      },
+    ];
+
+    const response = await this.client.responses.create({
+      model,
+      input,
+      tools,
+      temperature: request.temperature ?? 0,
+      max_output_tokens: request.maxTokens,
+      stream: false,
+    });
+
+    const latencyMs = Date.now() - startTime;
+
+    // Find the function call in the output
+    const functionCall = response.output.find(
+      (item): item is OpenAI.Responses.ResponseFunctionToolCall =>
+        item.type === "function_call" && item.name === "structured_response"
+    );
+
+    if (!functionCall) {
+      throw new Error(
+        "Expected function call response from OpenAI Responses API"
+      );
+    }
+
+    const rawResponse = functionCall.arguments;
+    const content = JSON.parse(rawResponse);
+
+    return {
+      content,
+      rawResponse,
+      usage: {
+        promptTokens: response.usage?.input_tokens ?? 0,
+        completionTokens: response.usage?.output_tokens ?? 0,
+        totalTokens:
+          (response.usage?.input_tokens ?? 0) +
+          (response.usage?.output_tokens ?? 0),
+      },
+      model: response.model,
+      provider: this.providerName,
+      latencyMs,
+    };
+  }
+
   buildApiPayload(request: LLMRequest): Record<string, unknown> {
     const model = request.model ?? this.defaultModel;
     const caps = getModelCapabilities(model);
@@ -231,8 +324,7 @@ export class OpenAIProvider implements ILLMProvider {
     return {
       model,
       messages,
-      modalities,
-      audio: audioConfig,
+      ...(audioConfig ? { modalities, audio: audioConfig } : {}),
       tools: [
         {
           type: "function",

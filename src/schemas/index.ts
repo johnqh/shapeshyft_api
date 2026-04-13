@@ -203,6 +203,7 @@ export const endpointCreateSchema = z.object({
   context: z.string().max(10000).nullish(),
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
+  web_search: z.boolean().optional().default(false),
   // For Whisper endpoints: model to use for structured extraction
   transcription_extraction_model: z.string().max(255).nullish(),
 });
@@ -221,6 +222,7 @@ export const endpointUpdateSchema = z.object({
   ip_allowlist: ipAllowlistSchema,
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
+  web_search: z.boolean().optional(),
   // For Whisper endpoints: model to use for structured extraction
   transcription_extraction_model: z.string().max(255).nullish(),
 });

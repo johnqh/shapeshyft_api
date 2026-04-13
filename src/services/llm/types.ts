@@ -47,6 +47,8 @@ interface LLMRequestBase {
     audio?: boolean;
     video?: boolean;
   };
+  /** Enable web search (OpenAI Responses API) */
+  webSearch?: boolean;
   /** For Whisper: model to use for structured extraction from transcription */
   extractionModel?: string;
   /** For Whisper: API key for the extraction model's provider */

@@ -204,6 +204,8 @@ export const endpoints = shapeshyftSchema.table(
     expects_media_output: jsonb("expects_media_output"),
     // How to return generated media ("base64" for inline, "url" for cloud storage)
     output_media_format: varchar("output_media_format", { length: 20 }),
+    // Enable web search for supported providers (OpenAI Responses API)
+    web_search: boolean("web_search").default(false),
     // For Whisper endpoints: model to use for structured extraction from transcription
     transcription_extraction_model: varchar("transcription_extraction_model", {
       length: 255,

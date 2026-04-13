@@ -314,6 +314,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "gpt-5.4-mini": {
@@ -323,6 +324,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "gpt-5.4-nano": {
@@ -340,6 +342,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "gpt-4.1-mini": {
@@ -349,6 +352,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "gpt-4.1-nano": {
@@ -390,6 +394,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "o3-pro": {
@@ -399,6 +404,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "o4-mini": {
@@ -408,6 +414,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
 

@@ -14,7 +14,7 @@
         "@sudobility/auth_service": "^1.1.15",
         "@sudobility/entity_service": "^1.0.32",
         "@sudobility/ratelimit_service": "^1.0.32",
-        "@sudobility/shapeshyft_types": "^1.0.50",
+        "@sudobility/shapeshyft_types": "^1.0.51",
         "@sudobility/subscription_service": "^1.0.16",
         "@sudobility/types": "^1.9.61",
         "drizzle-orm": "^0.45.0",
@@ -498,7 +498,7 @@
 
     "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.32", "", { "peerDependencies": { "@sudobility/types": "^1.9.61", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-+Slah9AIa6w/O32hmdcxGGGn1wRmx1lm6uVxCVCjWkBth4ZOCTP2QmTjlDnsXgXPTIq4NGPki++ZH3tRRQ5U4g=="],
 
-    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.50", "", { "peerDependencies": { "@sudobility/types": "^1.9.61" } }, "sha512-swrbLMasgBTlT/lWanj7lMCY94ma98SHlE0YRuUHQVpI5aySnAk68ELGnLL7yzMNUOyHJTob+ovwMCYtLfgtNg=="],
+    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.51", "", { "peerDependencies": { "@sudobility/types": "^1.9.61" } }, "sha512-J5n7jSsnq+bzWXhx3nReJh2SrVGCPW5gGursGOXWQr5xewtxjrzzlP4hBSq5gcyf3nkbg2ryzqzPfCkpnHtsmw=="],
 
     "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.16", "", {}, "sha512-pu7Sq8pEz+alQq+vKYA8sRDXWeKp2NsU5NwEO+bYDE8WKOX1Y3K17LNcgNSNOt6YLBMjzf6XgQqahXppW7w+bw=="],
 

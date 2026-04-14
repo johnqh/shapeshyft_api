@@ -706,7 +706,7 @@ async function handleAIRequest(c: any) {
       tokens_input: llmResponse.usage.promptTokens,
       tokens_output: llmResponse.usage.completionTokens,
       latency_ms: llmResponse.latencyMs,
-      estimated_cost_cents: Math.round(costCents * 100),
+      estimated_cost_cents: Math.round(costCents),
       request_metadata: {
         model: llmResponse.model,
         provider: llmResponse.provider,
@@ -720,7 +720,7 @@ async function handleAIRequest(c: any) {
         tokens_input: llmResponse.usage.promptTokens,
         tokens_output: llmResponse.usage.completionTokens,
         latency_ms: llmResponse.latencyMs,
-        estimated_cost_cents: Math.round(costCents * 100),
+        estimated_cost_cents: costCents,
       },
     };
 

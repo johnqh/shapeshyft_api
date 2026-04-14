@@ -1449,7 +1449,10 @@ export function getModelCapabilities(model: string): ModelCapabilities {
  * @returns Model pricing
  */
 export function getModelPricing(model: string): ModelPricing {
-  return MODEL_PRICING[model] ?? DEFAULT_MODEL_PRICING;
+  // Try exact match first, then strip date suffix (e.g., "gpt-4.1-mini-2025-04-14" -> "gpt-4.1-mini")
+  if (MODEL_PRICING[model]) return MODEL_PRICING[model]!;
+  const baseModel = model.replace(/-\d{4}-\d{2}-\d{2}$/, "");
+  return MODEL_PRICING[baseModel] ?? DEFAULT_MODEL_PRICING;
 }
 
 /**

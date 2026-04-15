@@ -20,6 +20,16 @@ import { getModelCapabilities } from "../../config/providers";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 
+class OpenAIProviderError extends Error {
+  details?: Record<string, unknown>;
+
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.name = "OpenAIProviderError";
+    this.details = details;
+  }
+}
+
 export class OpenAIProvider implements ILLMProvider {
   readonly providerName = "openai" as const;
   private client: OpenAI;
@@ -246,8 +256,21 @@ export class OpenAIProvider implements ILLMProvider {
     );
 
     if (!functionCall) {
-      throw new Error(
-        "Expected function call response from OpenAI Responses API"
+      const outputItems = response.output.map(item => ({
+        type: item.type,
+        ...("name" in item ? { name: item.name } : {}),
+        ...("id" in item ? { id: item.id } : {}),
+      }));
+
+      throw new OpenAIProviderError(
+        "Expected function call response from OpenAI Responses API",
+        {
+          model,
+          toolChoice: "structured_response",
+          responseId: response.id,
+          outputItems,
+          outputText: response.output_text ?? null,
+        }
       );
     }
 

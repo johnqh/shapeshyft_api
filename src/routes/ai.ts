@@ -734,6 +734,13 @@ async function handleAIRequest(c: any) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     const latencyMs = Date.now() - startTime;
+    const errorDetails =
+      error instanceof Error &&
+      "details" in error &&
+      error.details &&
+      typeof error.details === "object"
+        ? (error.details as Record<string, unknown>)
+        : undefined;
 
     // Log failed analytics
     await db.insert(usageAnalytics).values({
@@ -741,10 +748,27 @@ async function handleAIRequest(c: any) {
       success: false,
       error_message: errorMessage,
       latency_ms: latencyMs,
+      request_metadata: errorDetails
+        ? {
+            model: debugInfo.request.model,
+            provider: debugInfo.provider,
+            error_details: errorDetails,
+          }
+        : undefined,
     });
 
-    console.error("LLM processing failed:", errorMessage, debugInfo);
-    return c.json(errorResponse(`LLM processing failed: ${errorMessage}`), 500);
+    console.error("LLM processing failed:", errorMessage, {
+      ...debugInfo,
+      errorDetails,
+    });
+
+    return c.json(
+      {
+        ...errorResponse(`LLM processing failed: ${errorMessage}`),
+        details: errorDetails,
+      },
+      500
+    );
   }
 }
 

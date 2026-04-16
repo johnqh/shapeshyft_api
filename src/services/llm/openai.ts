@@ -249,26 +249,23 @@ export class OpenAIProvider implements ILLMProvider {
 
     const latencyMs = Date.now() - startTime;
 
-    // Find the function call in the output
+    // Extract structured response from function call
     const functionCall = response.output.find(
       (item): item is OpenAI.Responses.ResponseFunctionToolCall =>
         item.type === "function_call" && item.name === "structured_response"
     );
 
     if (!functionCall) {
-      const outputItems = response.output.map(item => ({
-        type: item.type,
-        ...("name" in item ? { name: item.name } : {}),
-        ...("id" in item ? { id: item.id } : {}),
-      }));
-
       throw new OpenAIProviderError(
         "Expected function call response from OpenAI Responses API",
         {
           model,
           toolChoice: "structured_response",
           responseId: response.id,
-          outputItems,
+          outputItems: response.output.map(item => ({
+            type: item.type,
+            ...("name" in item ? { name: item.name } : {}),
+          })),
           outputText: response.output_text ?? null,
         }
       );

@@ -9,43 +9,61 @@ renderable UI tree that a client app displays visually.
 
 ## Two Modes
 
-1. **Clarification Mode**: If the user's request is missing ANY
-information needed to give a specific, personalized, and
-accurate answer, you MUST respond with UI controls asking for
-the missing details. The user will resubmit with the information
-incorporated into their request.
+1. **Clarification Mode** (first request only): If the user's
+FIRST request is missing critical information needed to give a
+useful answer, you may respond with UI controls asking for the
+missing details. You get AT MOST ONE round of clarification.
+Ask all questions at once.
 
-2. **Answer Mode**: If and only if you have ALL the information
-needed to give a complete, specific answer, respond with
-appropriate display layouts showing the results.
+2. **Answer Mode** (always for follow-up requests): Once the user
+has provided any clarification, or if the first request has
+enough information, you MUST respond with a complete answer
+using display layouts. Never ask for more clarification after
+the first round. Never respond with a "please wait", "searching",
+or "processing" message — always return the actual answer.
 
 ## When to Use Clarification Mode
 
-You MUST ask before answering when ANY of the following are
-unknown:
+You may ask for clarification ONLY on the very first request,
+and ONLY when critical information is truly missing:
 
-- **Location**: Any request involving physical places
-(restaurants, stores, services, attractions, directions,
-weather, events) requires the user's city or area. Never assume
-a location.
-- **Preferences**: Requests like "recommend me a..." or "what
-should I..." need to know relevant preferences (budget, style,
-dietary restrictions, skill level, etc.).
-- **Scope**: Vague requests like "help me with..." or "I
-need..." need clarification on what specifically the user wants.
-- **Time/Date**: Questions about events, availability, hours, or
-scheduling need a time frame if not stated.
-- **Audience/Context**: Requests for recommendations, gifts,
-plans, or advice should understand who it's for and the
-occasion.
-- **Quantity/Size**: Requests involving amounts, group sizes, or
-capacity need specifics.
+- **Location**: Requests involving physical places require the
+user's city or area. Never assume a location.
+- **Preferences**: "recommend me a..." needs relevant preferences
+(budget, dietary restrictions, etc.).
+- **Scope**: Vague "help me with..." needs specifics.
+- **Time/Date**: Event-related questions need a time frame if
+not stated.
 
-When in doubt, ask. It is always better to ask one round of
-clarifying questions than to give a generic or assumed answer.
 Use the most appropriate input controls: \`input_text\` for
 open-ended, \`line_select\` for choices, \`input_numeric\` for
 numbers, \`input_date\` for dates, \`line_toggle\` for yes/no.
+
+## CRITICAL: Always Provide a Final Answer
+
+When the request includes clarification answers (e.g.,
+"Original query. Label: value, Label: value"), you MUST
+respond with a complete answer in Answer Mode. Do NOT:
+- Ask for additional clarification
+- Respond with "please wait" or "searching"
+- Return a paragraph saying you will look into it
+- Return empty or placeholder results
+- Fabricate fake data (e.g., "Open House 1", "123 Main St",
+  generic numbered items). This is WORSE than saying you
+  don't have real-time data.
+
+Instead, respond with REAL, helpful content:
+- If you know real places, businesses, or facts from your
+  training data, use them with accurate details.
+- If you do NOT have real-time or specific data (e.g., open
+  house listings, current events, live inventory), respond
+  honestly: use a \`paragraph\` explaining what you know and
+  a \`list\` of actionable suggestions (websites to check,
+  apps to use, search terms). Include \`link\` layouts with
+  real URLs where the user can find the information.
+- Never generate placeholder names like "Restaurant 1",
+  "Open House 2", or addresses like "123 Main St". Every
+  name and address must be real and verifiable.
 
 ## IRenderable Structure
 
@@ -65,7 +83,7 @@ Every node in the UI tree:
 
 ## Available Layouts
 
-### Input Controls (for Clarification Mode)
+### Input Controls (for Clarification Mode — first request only)
 - \`input_text\` — Free text input. \`title\` = label, \`subtitle\` = helper text, \`valueText\` = default value.
 - \`input_numeric\` — Number input
 - \`input_date\` — Date picker
@@ -108,7 +126,7 @@ Every node in the UI tree:
 
 1. Always return exactly one root IRenderable. Use \`stacked_vertical\` to combine multiple sections.
 2. Every node must have a unique \`id\`.
-3. For clarification: wrap inputs in \`stacked_vertical\`. Start with a \`header\` explaining what you need. Ask all related questions at once — do not ask one at a time.
+3. For clarification: wrap inputs in \`stacked_vertical\`. Start with a \`header\` explaining what you need. Ask ALL related questions at once — you only get one chance.
 4. For map results: use \`map\` layout. Every child must have \`location\` with realistic lat/long coordinates. You can pair a map with a list below it using \`stacked_vertical\`.
 5. Pick the layout that best presents the content. A factual answer → \`paragraph\`. A comparison → \`list\` or \`grid\`. Visual items → \`grid\` with \`tile\` children. Locations → \`map\`.
 6. For \`line_select\` options: each child needs \`view.title.text\` (display label) and \`destination.value\` (option value).
@@ -117,16 +135,9 @@ Every node in the UI tree:
 9. Never fabricate specific data (addresses, phone numbers, ratings, prices, coordinates). Only include factual details you are confident about or that come from web search results. If you cannot verify specifics, provide general guidance and suggest the user search for current details.
 10. For recommendations involving physical places such as restaurants, cafes, bars, stores, hotels, parks, or attractions, prefer a map-first answer. If you have one verified location, you may use \`map_pin\`. If you have multiple verified locations, use a root \`stacked_vertical\` containing a \`map\` section followed by a \`list\` or \`list_simple\` section.
 11. For every physical place you return in Answer Mode, include verified GPS coordinates in \`location\` whenever you include that place in a map. Each mapped place should also include its address in \`subtitle\` or \`details\`.
-12. For restaurant and place recommendations, do not return address-only results when a map would be the better presentation. If you can verify places but cannot verify coordinates for enough of them to support a useful map, ask a clarification question or return a clearly non-map fallback instead of pretending to have coordinates.
+12. For restaurant and place recommendations, do not return address-only results when a map would be the better presentation. If you can verify places but cannot verify coordinates for enough of them to support a useful map, return a clearly non-map fallback instead of pretending to have coordinates.
 13. When you provide both a map and a companion list, keep the same places in both, use consistent titles, and set matching \`destination.value\` identifiers so the client can connect the items.
-
-Key changes:
-- "Clarification Mode" is now the default — the model must have ALL info before answering
-- Explicit checklist of what requires clarification (location, preferences, scope, time, audience, quantity)
-- "When in doubt, ask" — reverses the default from "answer anyway" to "ask first"
-- "Ask all questions at once" — avoids multi-round ping-pong
-- Rule 9 — prevents fabricating addresses, phone numbers, or coordinates; only use verified data or web search results
-- Rules 10–13 — physical place results should include map-friendly coordinates and use map layouts when appropriate.`;
+14. If a request contains "Label: value" pairs after a period, those are user-provided answers from a previous clarification round. Use them directly and respond with a final answer — never ask again.`;
 
 const layoutEnum = [
   'input_text','input_numeric','input_date','input_email','input_phone','search','line_select','line_toggle','line_slider',
@@ -214,6 +225,7 @@ await sql`
   update shapeshyft.endpoints
   set instructions = ${instructions},
       output_schema = ${sql.json(outputSchema)},
+      web_search = true,
       updated_at = now()
   where uuid = ${'b2c341f2-2f76-4c45-bd04-351feffb95f6'}
 `;

@@ -204,6 +204,32 @@ export class OpenAIProvider implements ILLMProvider {
   // Web-search-aware generation (3-step)
   // ---------------------------------------------------------------------------
 
+  private static INPUT_LAYOUTS = new Set([
+    "input_text",
+    "input_numeric",
+    "input_date",
+    "input_email",
+    "input_phone",
+    "search",
+    "line_select",
+    "line_toggle",
+    "line_slider",
+  ]);
+
+  /** Check if a renderable tree contains input controls (clarification). */
+  private containsInputControls(data: unknown): boolean {
+    if (typeof data !== "object" || data === null) return false;
+    const obj = data as Record<string, unknown>;
+    const view = obj.view as Record<string, unknown> | undefined;
+    if (view?.layout && OpenAIProvider.INPUT_LAYOUTS.has(view.layout as string))
+      return true;
+    const children = (view?.children ?? obj.children) as unknown[] | undefined;
+    if (Array.isArray(children)) {
+      return children.some(child => this.containsInputControls(child));
+    }
+    return false;
+  }
+
   /**
    * Wrap the user's output schema in a container that lets the AI signal
    * whether it needs a web search before it can answer.
@@ -444,9 +470,21 @@ export class OpenAIProvider implements ILLMProvider {
       `[web-search] Triage result: web_search_needed=${triageData.web_search_needed}`
     );
 
-    // --- If no search needed, return user_data directly -------------------
-    if (!triageData.web_search_needed) {
-      console.log(`[web-search] No search needed, returning user_data`);
+    // --- If no search needed, or user_data is a clarification form, return directly
+    const isClarification = this.containsInputControls(triageData.user_data);
+    const shouldSearch =
+      triageData.web_search_needed === true && !isClarification;
+
+    if (!shouldSearch) {
+      if (isClarification && triageData.web_search_needed) {
+        console.log(
+          `[web-search] AI set web_search_needed=true but response contains input controls — returning clarification`
+        );
+      } else {
+        console.log(
+          `[web-search] No search needed (web_search_needed=${triageData.web_search_needed}), returning user_data`
+        );
+      }
       const rawResponse = JSON.stringify(triageData.user_data);
       return {
         content: triageData.user_data,

@@ -236,6 +236,33 @@ function getTestMode(c: any): boolean {
 }
 
 /**
+ * Resolve whether web search should be enabled.
+ * The endpoint config is the default. If the request body includes a
+ * `web_search` boolean, it can only disable search (not enable it on
+ * an endpoint that doesn't support it).
+ */
+/**
+ * Resolve whether web search should be enabled and strip the
+ * `web_search` field from inputData so it doesn't leak into the prompt.
+ */
+function resolveWebSearch(
+  endpointDefault: boolean,
+  inputData: unknown
+): boolean {
+  if (!endpointDefault) return false;
+  if (
+    typeof inputData === "object" &&
+    inputData !== null &&
+    "web_search" in inputData
+  ) {
+    const value = (inputData as Record<string, unknown>).web_search !== false;
+    delete (inputData as Record<string, unknown>).web_search;
+    return value;
+  }
+  return true;
+}
+
+/**
  * Check if an entity is owned by a site admin.
  * Entities owned by site admins are exempt from rate limiting.
  * This applies to both personal and organization entities.
@@ -653,7 +680,7 @@ async function handleAIRequest(c: any) {
     model,
     media: media.length > 0 ? media : undefined,
     expectsMediaOutput: expectsMediaOutput ?? undefined,
-    webSearch: endpoint.web_search ?? false,
+    webSearch: resolveWebSearch(endpoint.web_search ?? false, inputData),
   };
 
   const llmRequest: LLMRequest =

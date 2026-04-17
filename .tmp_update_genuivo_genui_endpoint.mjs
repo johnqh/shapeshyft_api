@@ -53,17 +53,18 @@ respond with a complete answer in Answer Mode. Do NOT:
   don't have real-time data.
 
 Instead, respond with REAL, helpful content:
-- If you know real places, businesses, or facts from your
-  training data, use them with accurate details.
-- If you do NOT have real-time or specific data (e.g., open
-  house listings, current events, live inventory), respond
-  honestly: use a \`paragraph\` explaining what you know and
-  a \`list\` of actionable suggestions (websites to check,
-  apps to use, search terms). Include \`link\` layouts with
-  real URLs where the user can find the information.
+- Only include places, businesses, and addresses you are
+  CERTAIN are real and accurate. If you are not 100% sure
+  a place exists at a specific address, do NOT include it.
+- Do not guess addresses or coordinates. If you know a
+  restaurant exists but are unsure of its exact address,
+  mention the restaurant by name without a specific address.
 - Never generate placeholder names like "Restaurant 1",
-  "Open House 2", or addresses like "123 Main St". Every
-  name and address must be real and verifiable.
+  "Open House 2", or made-up addresses like "123 Main St",
+  "365 10th St". Every name and address must be verifiable.
+- When you cannot verify enough places for a useful map,
+  use a \`paragraph\` or \`list\` layout without coordinates
+  instead of fabricating map data.
 
 ## IRenderable Structure
 

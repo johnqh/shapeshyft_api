@@ -7,7 +7,7 @@
  */
 
 import OpenAI from "openai";
-import type { GeneratedMedia } from "@sudobility/shapeshyft_types";
+import type { GeneratedMedia, JsonSchema } from "@sudobility/shapeshyft_types";
 import {
   requiresEntityId,
   type ILLMProvider,
@@ -17,6 +17,11 @@ import {
 } from "./types";
 import { getOpenAIAudioFormat } from "../../lib/media-constants";
 import { getModelCapabilities } from "../../config/providers";
+import {
+  buildOutputStructureSection,
+  buildResponseFormatSection,
+  buildWebSearchRoutingSection,
+} from "../../lib/prompt-builder";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 
@@ -44,6 +49,9 @@ export class OpenAIProvider implements ILLMProvider {
   }
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
+    console.log(
+      `[llm] generate() called, webSearch=${request.webSearch}, model=${request.model}`
+    );
     // Use Responses API when web search is enabled
     if (request.webSearch) {
       return this.generateWithSearch(request);
@@ -192,23 +200,164 @@ export class OpenAIProvider implements ILLMProvider {
    * Generate using the OpenAI Responses API with web search enabled.
    * The model can search the web and then call the structured_response function.
    */
-  private async generateWithSearch(request: LLMRequest): Promise<LLMResponse> {
-    const model = request.model ?? this.defaultModel;
-    const startTime = Date.now();
+  // ---------------------------------------------------------------------------
+  // Web-search-aware generation (3-step)
+  // ---------------------------------------------------------------------------
 
-    // Build input messages
-    const input: OpenAI.Responses.ResponseInputItem[] = [];
-    if (request.systemPrompt) {
-      input.push({
-        role: "developer" as const,
-        content: request.systemPrompt,
-      });
+  /**
+   * Wrap the user's output schema in a container that lets the AI signal
+   * whether it needs a web search before it can answer.
+   */
+  private buildTriageSchema(
+    userSchema: Record<string, unknown>
+  ): Record<string, unknown> {
+    return {
+      type: "object",
+      required: ["user_data"],
+      properties: {
+        user_data: userSchema,
+        web_search_needed: {
+          type: "boolean",
+          default: false,
+          description:
+            "Set to true when you would say 'I don't have real-time data' or " +
+            "'I cannot access current listings'. The system WILL perform a web search " +
+            "and provide you the results. Set to false when asking for clarification " +
+            "or when you can answer from training data.",
+        },
+      },
+      additionalProperties: false,
+    };
+  }
+
+  /**
+   * Build the system prompt for step 1: try to answer fully, signal
+   * web_search_needed only if real-time data is genuinely required.
+   */
+
+  /**
+   * Call the Responses API with a forced function call.
+   * Used for both the triage step and the structuring step.
+   */
+  private async callResponsesStructured(
+    model: string,
+    input: OpenAI.Responses.ResponseInputItem[],
+    schema: Record<string, unknown>,
+    temperature: number,
+    maxTokens?: number
+  ): Promise<{
+    content: unknown;
+    rawResponse: string;
+    usage: { inputTokens: number; outputTokens: number };
+    model: string;
+  }> {
+    console.log(
+      `[web-search] callResponsesStructured() calling Responses API, model=${model}`
+    );
+    const response = await this.client.responses.create({
+      model,
+      input,
+      tools: [
+        {
+          type: "function",
+          name: "structured_response",
+          description: "Generate structured response matching the schema",
+          parameters: schema,
+          strict: false,
+        },
+      ],
+      tool_choice: {
+        type: "function",
+        name: "structured_response",
+      },
+      temperature,
+      max_output_tokens: maxTokens,
+    });
+
+    const functionCall = response.output.find(
+      (item): item is OpenAI.Responses.ResponseFunctionToolCall =>
+        item.type === "function_call" && item.name === "structured_response"
+    );
+
+    if (!functionCall) {
+      throw new OpenAIProviderError(
+        "Expected structured_response function call from Responses API",
+        {
+          model,
+          responseId: response.id,
+          outputItems: response.output.map(item => ({
+            type: item.type,
+            ...("name" in item ? { name: item.name } : {}),
+          })),
+        }
+      );
     }
 
-    // Build user content (text + optional media)
+    return {
+      content: JSON.parse(functionCall.arguments),
+      rawResponse: functionCall.arguments,
+      usage: {
+        inputTokens: response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.output_tokens ?? 0,
+      },
+      model: response.model,
+    };
+  }
+
+  /**
+   * Search the web via the Responses API and return a text summary.
+   */
+  private async searchWeb(
+    model: string,
+    query: string,
+    temperature: number
+  ): Promise<{
+    summary: string;
+    usage: { inputTokens: number; outputTokens: number };
+  }> {
+    console.log(
+      `[web-search] searchWeb() calling Responses API for query: "${query.substring(0, 100)}..."`
+    );
+    const response = await this.client.responses.create({
+      model,
+      input: [
+        {
+          role: "developer" as const,
+          content:
+            "Search the web for the requested information. " +
+            "Return a thorough summary of the results with specific details, " +
+            "names, addresses, dates, and URLs when available.",
+        },
+        { role: "user" as const, content: query },
+      ],
+      tools: [{ type: "web_search_preview" }],
+      temperature,
+    });
+
+    return {
+      summary: response.output_text ?? "",
+      usage: {
+        inputTokens: response.usage?.input_tokens ?? 0,
+        outputTokens: response.usage?.output_tokens ?? 0,
+      },
+    };
+  }
+
+  /** Build Responses API input from an LLM request. */
+  private buildResponsesInput(
+    systemPrompt: string | undefined,
+    userPrompt: string,
+    media?: LLMRequest["media"]
+  ): OpenAI.Responses.ResponseInputItem[] {
+    const input: OpenAI.Responses.ResponseInputItem[] = [];
+
+    if (systemPrompt) {
+      input.push({ role: "developer" as const, content: systemPrompt });
+    }
+
     const userContent: OpenAI.Responses.ResponseInputContent[] = [];
-    if (request.media?.length) {
-      for (const m of request.media) {
+    if (media?.length) {
+      for (const m of media) {
         if (m.type === "image") {
           userContent.push({
             type: "input_image",
@@ -221,72 +370,156 @@ export class OpenAIProvider implements ILLMProvider {
         }
       }
     }
-    userContent.push({ type: "input_text", text: request.prompt });
+    userContent.push({ type: "input_text", text: userPrompt });
     input.push({ role: "user" as const, content: userContent });
 
-    const tools: OpenAI.Responses.Tool[] = [
-      { type: "web_search_preview" },
-      {
-        type: "function",
-        name: "structured_response",
-        description: "Generate structured response matching the schema",
-        parameters: request.outputSchema as Record<string, unknown>,
-        strict: false,
-      },
-    ];
+    return input;
+  }
 
-    const response = await this.client.responses.create({
-      model,
-      input,
-      tools,
-      tool_choice: {
-        type: "function",
-        name: "structured_response",
-      },
-      temperature: request.temperature ?? 0,
-      max_output_tokens: request.maxTokens,
-    });
+  /**
+   * Main entry point when web search is enabled on the endpoint.
+   *
+   * 1. Try to answer via Responses API with triage wrapper schema.
+   *    AI provides full answer OR signals web_search_needed.
+   * 2. If no search needed → return user_data directly.
+   * 3. If search needed → web search → structure results.
+   */
+  private async generateWithSearch(request: LLMRequest): Promise<LLMResponse> {
+    console.log(`[web-search] generateWithSearch() entered`);
+    const model = request.model ?? this.defaultModel;
+    const startTime = Date.now();
+    const userSchema = request.outputSchema as Record<string, unknown>;
+    const temperature = request.temperature ?? 0;
 
-    const latencyMs = Date.now() - startTime;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
 
-    // Extract structured response from function call
-    const functionCall = response.output.find(
-      (item): item is OpenAI.Responses.ResponseFunctionToolCall =>
-        item.type === "function_call" && item.name === "structured_response"
+    // --- Step 1: Try to answer (Responses API, forced function call) ------
+    console.log(
+      `[web-search] Step 1: Triage via Responses API, model=${model}`
     );
 
-    if (!functionCall) {
-      throw new OpenAIProviderError(
-        "Expected function call response from OpenAI Responses API",
-        {
-          model,
-          toolChoice: "structured_response",
-          responseId: response.id,
-          outputItems: response.output.map(item => ({
-            type: item.type,
-            ...("name" in item ? { name: item.name } : {}),
-          })),
-          outputText: response.output_text ?? null,
-        }
-      );
+    const triageSchema = this.buildTriageSchema(userSchema);
+
+    // Replace the output structure / example / response format sections
+    // with ones generated from the triage wrapper schema.
+    // Keep everything before "## Output Structure" (base + task description + rules).
+    const systemPrompt = request.systemPrompt ?? "";
+    const outputStructureIdx = systemPrompt.indexOf("\n## Output Structure");
+    const basePart =
+      outputStructureIdx >= 0
+        ? systemPrompt.substring(0, outputStructureIdx)
+        : systemPrompt;
+
+    const triageSystemPrompt =
+      basePart +
+      buildWebSearchRoutingSection() +
+      buildOutputStructureSection(triageSchema as JsonSchema) +
+      buildResponseFormatSection();
+    console.log(`[web-search] System prompt:\n${triageSystemPrompt}`);
+
+    const triageInput = this.buildResponsesInput(
+      triageSystemPrompt,
+      request.prompt,
+      request.media
+    );
+
+    const triageResult = await this.callResponsesStructured(
+      model,
+      triageInput,
+      triageSchema,
+      temperature,
+      request.maxTokens
+    );
+
+    totalInputTokens += triageResult.usage.inputTokens;
+    totalOutputTokens += triageResult.usage.outputTokens;
+
+    const triageData = triageResult.content as {
+      web_search_needed?: boolean;
+      user_data?: unknown;
+    };
+
+    console.log(
+      `[web-search] Triage result: web_search_needed=${triageData.web_search_needed}`
+    );
+
+    // --- If no search needed, return user_data directly -------------------
+    if (!triageData.web_search_needed) {
+      console.log(`[web-search] No search needed, returning user_data`);
+      const rawResponse = JSON.stringify(triageData.user_data);
+      return {
+        content: triageData.user_data,
+        rawResponse,
+        usage: {
+          promptTokens: totalInputTokens,
+          completionTokens: totalOutputTokens,
+          totalTokens: totalInputTokens + totalOutputTokens,
+        },
+        model: triageResult.model,
+        provider: this.providerName,
+        latencyMs: Date.now() - startTime,
+      };
     }
 
-    const rawResponse = functionCall.arguments;
-    const content = JSON.parse(rawResponse);
+    // --- Step 2: Web search -----------------------------------------------
+    console.log(`[web-search] Step 2: Searching the web`);
+    const searchResult = await this.searchWeb(
+      model,
+      request.prompt,
+      temperature
+    );
+
+    totalInputTokens += searchResult.usage.inputTokens;
+    totalOutputTokens += searchResult.usage.outputTokens;
+    console.log(
+      `[web-search] Step 2 done: ${searchResult.summary.length} chars`
+    );
+
+    // --- Step 3: Structure search results (Responses API) -----------------
+    console.log(`[web-search] Step 3: Structuring search results`);
+
+    const structureSystemPrompt =
+      (request.systemPrompt ?? "") +
+      "\n\n## Important\n" +
+      "You are being given web search results. Use ONLY the facts from " +
+      "these results to build your response. Do not fabricate any names, " +
+      "addresses, or data not found in the search results.";
+
+    const structureInput = this.buildResponsesInput(
+      structureSystemPrompt,
+      `Original request: ${request.prompt}\n\n` +
+        `Web search results:\n\n${searchResult.summary}\n\n` +
+        "Using ONLY the information from the web search results above, " +
+        "generate the structured response."
+    );
+
+    const structureResult = await this.callResponsesStructured(
+      model,
+      structureInput,
+      userSchema,
+      temperature,
+      request.maxTokens
+    );
+
+    totalInputTokens += structureResult.usage.inputTokens;
+    totalOutputTokens += structureResult.usage.outputTokens;
+
+    console.log(
+      `[web-search] Step 3 done, total time: ${Date.now() - startTime}ms`
+    );
 
     return {
-      content,
-      rawResponse,
+      content: structureResult.content,
+      rawResponse: structureResult.rawResponse,
       usage: {
-        promptTokens: response.usage?.input_tokens ?? 0,
-        completionTokens: response.usage?.output_tokens ?? 0,
-        totalTokens:
-          (response.usage?.input_tokens ?? 0) +
-          (response.usage?.output_tokens ?? 0),
+        promptTokens: totalInputTokens,
+        completionTokens: totalOutputTokens,
+        totalTokens: totalInputTokens + totalOutputTokens,
       },
-      model: response.model,
+      model: structureResult.model,
       provider: this.providerName,
-      latencyMs,
+      latencyMs: Date.now() - startTime,
     };
   }
 

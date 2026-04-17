@@ -193,45 +193,98 @@ export function isComplexSchema(schema: JsonSchema): boolean {
 /**
  * Build the system prompt with schema instructions
  */
+/**
+ * Build the base instruction section.
+ */
+export function buildBaseInstruction(): string {
+  return "You are a helpful assistant that produces structured data output.";
+}
+
+/**
+ * Build the task description section from the user's endpoint instructions.
+ */
+export function buildTaskDescriptionSection(
+  userDescription: string | null
+): string {
+  if (!userDescription) return "";
+  return `\n## Task Description\n${userDescription}`;
+}
+
+/**
+ * Build the output structure section from a JSON schema.
+ */
+export function buildOutputStructureSection(
+  outputSchema: JsonSchema | null
+): string {
+  if (!outputSchema) return "";
+  const parts: string[] = [];
+
+  const schemaInstructions = schemaToPromptInstructions(outputSchema);
+  parts.push(
+    `\n## Output Structure\nYour response must include the following fields:\n${schemaInstructions}`
+  );
+
+  if (isComplexSchema(outputSchema)) {
+    const example = generateSchemaExample(outputSchema);
+    parts.push(
+      `\n## Example Output Structure\n\`\`\`json\n${JSON.stringify(example, null, 2)}\n\`\`\``
+    );
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Build the response format section.
+ */
+export function buildResponseFormatSection(): string {
+  return (
+    "\n## Response Format\nRespond with valid JSON only. Do not include any text outside the JSON object. " +
+    'IMPORTANT: All string values must use proper JSON escaping — use \\" for double quotes, \\n for newlines, \\\\ for backslashes.'
+  );
+}
+
+/**
+ * Build the web search routing section. Inserted between the task description
+ * and the output structure when the endpoint supports web search.
+ * Clarifies the wrapper object and overrides any conflicting rules.
+ */
+export function buildWebSearchRoutingSection(): string {
+  return (
+    "\n## Response Wrapper (OVERRIDES conflicting rules above)\n" +
+    "Your JSON response is a wrapper object. You MUST always provide `user_data`.\n\n" +
+    "- `user_data` (object, REQUIRED) — your IRenderable response goes here. " +
+    "Always fill this with either a clarification form or a complete answer.\n" +
+    "- `web_search_needed` (boolean, optional, defaults to false) — " +
+    "set to true when you would otherwise say 'I don't have real-time data' " +
+    "or 'I cannot access current listings'. The system WILL perform a web " +
+    "search for you and call you again with the results.\n\n" +
+    "When previous rules say 'return one root IRenderable', they mean inside `user_data`.\n\n" +
+    "`web_search_needed` = false:\n" +
+    "- Asking user for location/preferences/details (clarification)\n" +
+    "- Answering from training data (recipes, coding, general knowledge)\n\n" +
+    "`web_search_needed` = true:\n" +
+    "- You have the user's location/date but need live data (listings, prices, events, weather)\n" +
+    "- You would otherwise respond with 'I don't have access to real-time data'"
+  );
+}
+
+/**
+ * Build the system prompt with schema instructions.
+ * Composes all sections: base → task description → output structure → response format.
+ */
 export function buildSystemPrompt(
   userDescription: string | null,
   outputSchema: JsonSchema | null
 ): string {
-  const parts: string[] = [];
-
-  // Base instruction
-  parts.push(
-    "You are a helpful assistant that produces structured data output."
-  );
-
-  // User's description
-  if (userDescription) {
-    parts.push(`\n## Task Description\n${userDescription}`);
-  }
-
-  // Schema instructions
-  if (outputSchema) {
-    const schemaInstructions = schemaToPromptInstructions(outputSchema);
-    parts.push(
-      `\n## Output Structure\nYour response must include the following fields:\n${schemaInstructions}`
-    );
-
-    // Add example if schema is complex
-    if (isComplexSchema(outputSchema)) {
-      const example = generateSchemaExample(outputSchema);
-      parts.push(
-        `\n## Example Output Structure\n\`\`\`json\n${JSON.stringify(example, null, 2)}\n\`\`\``
-      );
-    }
-  }
-
-  // JSON instruction
-  parts.push(
-    "\n## Response Format\nRespond with valid JSON only. Do not include any text outside the JSON object. " +
-      'IMPORTANT: All string values must use proper JSON escaping — use \\" for double quotes, \\n for newlines, \\\\ for backslashes.'
-  );
-
-  return parts.join("\n");
+  return [
+    buildBaseInstruction(),
+    buildTaskDescriptionSection(userDescription),
+    buildOutputStructureSection(outputSchema),
+    buildResponseFormatSection(),
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**

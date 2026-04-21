@@ -715,8 +715,24 @@ async function handleAIRequest(c: any) {
     request: llmRequest,
   };
 
+  console.log("[AI] Prompt sent to LLM:", {
+    provider: llmKey.provider,
+    model,
+    instructions: endpoint.instructions,
+    systemPrompt: prompts.system,
+    userPrompt: prompts.user,
+  });
+
   try {
     const llmResponse = await provider.generate(llmRequest);
+
+    console.log("[AI] LLM response:", {
+      provider: llmResponse.provider,
+      model: llmResponse.model,
+      content: llmResponse.content,
+      usage: llmResponse.usage,
+      latencyMs: llmResponse.latencyMs,
+    });
 
     // 5. Calculate cost
     const pricing = getModelPricing(llmResponse.model);

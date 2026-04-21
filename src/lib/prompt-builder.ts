@@ -275,11 +275,13 @@ export function buildWebSearchRoutingSection(): string {
  */
 export function buildSystemPrompt(
   userDescription: string | null,
-  outputSchema: JsonSchema | null
+  outputSchema: JsonSchema | null,
+  context?: string | null
 ): string {
   return [
     buildBaseInstruction(),
     buildTaskDescriptionSection(userDescription),
+    context ? `\n## Context\n${context}` : "",
     buildOutputStructureSection(outputSchema),
     buildResponseFormatSection(),
   ]

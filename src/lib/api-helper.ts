@@ -170,7 +170,11 @@ export const ApiHelper = {
    */
   buildLegacyPrompts(input: PromptInput): { system: string; user: string } {
     return {
-      system: buildSystemPrompt(input.instructions, input.outputSchema),
+      system: buildSystemPrompt(
+        input.instructions,
+        input.outputSchema,
+        input.context
+      ),
       user: buildUserPrompt(input.inputData, true), // Always structured input
     };
   },

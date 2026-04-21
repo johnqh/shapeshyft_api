@@ -209,9 +209,11 @@ export class CustomLLMProvider implements ILLMProvider {
     try {
       return JSON.parse(text);
     } catch {
-      // Fix broken escape sequences first (e.g., "\ n" -> "\n", "\ t" -> "\t")
-      // LLMs sometimes insert a space between backslash and escape character
-      let repaired = text.replace(/\\ ([nrtbf"\\\/])/g, "\\$1");
+      // Fix invalid escape sequences first:
+      // 1. \' -> ' (common LLM error — valid in JS/Python but invalid in JSON)
+      // 2. "\ n" -> "\n" (LLMs sometimes insert a space between backslash and escape char)
+      let repaired = text.replace(/\\'/g, "'");
+      repaired = repaired.replace(/\\ ([nrtbf"\\\/])/g, "\\$1");
 
       try {
         return JSON.parse(repaired);

@@ -240,7 +240,8 @@ export function buildOutputStructureSection(
 export function buildResponseFormatSection(): string {
   return (
     "\n## Response Format\nRespond with valid JSON only. Do not include any text outside the JSON object. " +
-    'IMPORTANT: All string values must use proper JSON escaping — use \\" for double quotes, \\n for newlines, \\\\ for backslashes.'
+    'IMPORTANT: All string values must use proper JSON escaping — use \\" for double quotes, \\n for newlines, \\\\ for backslashes. ' +
+    "Do NOT escape single quotes — \\' is invalid JSON. Write apostrophes and single quotes literally."
   );
 }
 
@@ -479,6 +480,7 @@ export function getProviderPromptConfig(
           "Respond with valid JSON only. Do not include any text, markdown code blocks, or thinking outside the JSON object. " +
           "IMPORTANT: All string values in the JSON must use proper JSON escaping. " +
           'Use \\" for double quotes, \\n for newlines, \\t for tabs, and \\\\ for backslashes inside string values. ' +
+          'Do NOT escape single quotes — \\\' is invalid JSON. Write apostrophes and single quotes literally (e.g. "it\'s" not "it\\\'s"). ' +
           "Do not put literal newlines or unescaped special characters inside JSON strings.",
         includeExample: true,
         verboseSchema: false,

@@ -13,7 +13,10 @@ import type {
   ProviderConfig,
 } from "./types";
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+// Fallback when an endpoint doesn't pin a model. claude-sonnet-4-20250514 is
+// deprecated (retires 2026-06-15); use a current, non-deprecated Sonnet-tier id.
+// (Bump to "claude-sonnet-5" or "claude-opus-4-8" for the latest tier.)
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 export class AnthropicProvider implements ILLMProvider {
   readonly providerName = "anthropic" as const;
@@ -85,7 +88,10 @@ export class AnthropicProvider implements ILLMProvider {
       messages: [{ role: "user", content: userContent }],
       tools,
       tool_choice: { type: "tool", name: "structured_response" },
-      temperature: request.temperature ?? 0,
+      // `temperature`/`top_p` are rejected (400) on Opus 4.7+, Sonnet 5, and
+      // Fable 5. Only send it when a caller explicitly requests one; older
+      // models still accept it. Omitting it lets current models work.
+      ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
     });
 
     const latencyMs = Date.now() - startTime;
@@ -168,7 +174,8 @@ export class AnthropicProvider implements ILLMProvider {
         },
       ],
       tool_choice: { type: "tool", name: "structured_response" },
-      temperature: request.temperature ?? 0,
+      // See generate(): only include temperature when explicitly requested.
+      ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
     };
   }
 }

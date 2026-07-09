@@ -44,7 +44,12 @@ export class OpenAIProvider implements ILLMProvider {
     if (!config.apiKey) {
       throw new Error("OpenAI API key is required");
     }
-    this.client = new OpenAI({ apiKey: config.apiKey });
+    // Honor a custom base URL so OpenAI-compatible providers (Mistral, xAI,
+    // DeepSeek, Perplexity) reach their own API instead of api.openai.com.
+    this.client = new OpenAI({
+      apiKey: config.apiKey,
+      ...(config.endpointUrl ? { baseURL: config.endpointUrl } : {}),
+    });
     this.defaultModel = config.model ?? DEFAULT_MODEL;
   }
 

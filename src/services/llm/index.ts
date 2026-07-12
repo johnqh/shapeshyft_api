@@ -45,7 +45,8 @@ export function createLLMProvider(
     case "perplexity":
       return new OpenAIProvider({
         ...config,
-        endpointUrl: config.endpointUrl ?? OPENAI_COMPATIBLE_BASE_URLS[providerType],
+        endpointUrl:
+          config.endpointUrl ?? OPENAI_COMPATIBLE_BASE_URLS[providerType],
       });
     // NOTE: Cohere's API is NOT OpenAI-compatible (different request/response
     // shape); routing it through OpenAIProvider will not work regardless of base

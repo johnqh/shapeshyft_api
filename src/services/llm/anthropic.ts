@@ -91,7 +91,9 @@ export class AnthropicProvider implements ILLMProvider {
       // `temperature`/`top_p` are rejected (400) on Opus 4.7+, Sonnet 5, and
       // Fable 5. Only send it when a caller explicitly requests one; older
       // models still accept it. Omitting it lets current models work.
-      ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+      ...(request.temperature !== undefined
+        ? { temperature: request.temperature }
+        : {}),
     });
 
     const latencyMs = Date.now() - startTime;
@@ -175,7 +177,9 @@ export class AnthropicProvider implements ILLMProvider {
       ],
       tool_choice: { type: "tool", name: "structured_response" },
       // See generate(): only include temperature when explicitly requested.
-      ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+      ...(request.temperature !== undefined
+        ? { temperature: request.temperature }
+        : {}),
     };
   }
 }

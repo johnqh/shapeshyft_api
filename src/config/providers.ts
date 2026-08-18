@@ -5,16 +5,31 @@
  * without requiring frontend package updates.
  *
  * ## Supported Providers
- * - **openai**: OpenAI GPT models (GPT-5.4, GPT-5, GPT-4.1, o3, o4-mini)
- * - **anthropic**: Anthropic Claude models (Claude 4.7, Claude 4.6, Claude 4.5)
- * - **gemini**: Google Gemini models (Gemini 3.5, 3.1, 2.5, Imagen 4, Veo 3.1)
- * - **mistral**: Mistral AI models (Mistral Large, Pixtral)
- * - **cohere**: Cohere Command models
- * - **groq**: Groq-hosted models (Llama, Whisper)
- * - **xai**: xAI Grok models
- * - **deepseek**: DeepSeek Chat and Reasoner
- * - **perplexity**: Perplexity Sonar models with web search
+ *
+ * Catalog verified against provider documentation on 2026-08-18.
+ *
+ * - **openai**: GPT-5.6 (Sol/Terra/Luna), GPT-5.5, GPT-5.4, GPT-5, GPT-4.1, GPT-4o
+ * - **anthropic**: Claude Fable 5, Opus 5, Sonnet 5, Haiku 4.5 (+ Opus 4.8/4.7/4.6, Sonnet 4.6)
+ * - **gemini**: Gemini 3.7/3.6/3.5/3.1 and 2.5, Nano Banana image models, Veo 3.1 video
+ * - **mistral**: Mistral Large 3, Medium 3.5, Small 4, Ministral 3, Codestral, OCR
+ * - **cohere**: Command A+, Command A (reasoning/vision/translate), Command R
+ * - **groq**: GPT-OSS, Qwen3.6, MiniMax M2.7, Compound, Whisper
+ * - **xai**: Grok 4.6, 4.5, 4.3, Grok 4.20 variants, Grok Build
+ * - **deepseek**: DeepSeek V4 Pro and V4 Flash
+ * - **perplexity**: Sonar models with live web search grounding
  * - **lm_studio**: Local LLM server (LM Studio or any OpenAI-compatible endpoint)
+ *
+ * ## Keeping this current
+ *
+ * Model lineups turn over every few weeks and retired IDs fail at the provider,
+ * not here -- `MODEL_CAPABILITIES` and `MODEL_PRICING` fall back to permissive
+ * defaults for anything unknown, so a stale entry surfaces as a runtime error in
+ * a user's endpoint. When updating, work from each provider's own model and
+ * pricing pages (linked above each section below), and check the provider's
+ * deprecation page for retirements: Groq retired `llama-3.3-70b-versatile` and
+ * `llama-3.1-8b-instant` on 2026-08-16, and both were listed here until then.
+ *
+ * Pricing is in **cents per 1M tokens** (image per image, audio/video per minute).
  *
  * ## LM Studio Model Identifiers
  *
@@ -72,71 +87,74 @@ export const PROVIDERS: ProviderConfig[] = [
   {
     id: "openai",
     name: "OpenAI",
-    description: "GPT-5.4, GPT-5, GPT-4.1, o3 models",
+    description: "GPT-5.6 (Sol, Terra, Luna), GPT-5.5, GPT-5.4, GPT-4.1 models",
     allowsCustomModel: false,
-    defaultModel: "gpt-5.4-mini",
+    defaultModel: "gpt-5.6-terra",
     requiresEndpointUrl: false,
   },
   {
     id: "anthropic",
     name: "Anthropic",
-    description: "Claude 4.7, Claude 4.6 models",
+    description: "Claude Fable 5, Opus 5, Sonnet 5, Haiku 4.5 models",
     allowsCustomModel: false,
-    defaultModel: "claude-sonnet-4-6-20260217",
+    defaultModel: "claude-sonnet-5",
     requiresEndpointUrl: false,
   },
   {
     id: "gemini",
     name: "Google Gemini",
-    description: "Gemini 3.5, Gemini 3.1, Gemini 2.5 models",
+    description:
+      "Gemini 3.7, 3.6, 3.5, 3.1 and 2.5 models, plus Nano Banana image models",
     allowsCustomModel: false,
-    defaultModel: "gemini-3.5-flash",
+    defaultModel: "gemini-3.7-flash",
     requiresEndpointUrl: false,
   },
   {
     id: "mistral",
     name: "Mistral AI",
-    description: "Mistral Large, Small, Codestral models",
+    description:
+      "Mistral Large 3, Medium 3.5, Small 4, Ministral 3, Codestral models",
     allowsCustomModel: false,
-    defaultModel: "mistral-small-latest",
+    defaultModel: "mistral-medium-latest",
     requiresEndpointUrl: false,
   },
   {
     id: "cohere",
     name: "Cohere",
-    description: "Command R, Command R+ models",
+    description: "Command A+, Command A, Command R models",
     allowsCustomModel: false,
-    defaultModel: "command-r-08-2024",
+    defaultModel: "command-a-plus-05-2026",
     requiresEndpointUrl: false,
   },
   {
     id: "groq",
     name: "Groq",
-    description: "Fast inference with Llama, Mixtral models",
+    description:
+      "Fast inference with GPT-OSS, Qwen, MiniMax, Compound, and Whisper",
     allowsCustomModel: false,
-    defaultModel: "llama-3.3-70b-versatile",
+    defaultModel: "openai/gpt-oss-120b",
     requiresEndpointUrl: false,
   },
   {
     id: "xai",
     name: "xAI",
-    description: "Grok models",
+    description: "Grok 4.6, 4.5, 4.3 and Grok Build models",
     allowsCustomModel: false,
-    defaultModel: "grok-4-1-fast-non-reasoning",
+    defaultModel: "grok-4.6",
     requiresEndpointUrl: false,
   },
   {
     id: "deepseek",
     name: "DeepSeek",
-    description: "DeepSeek V4 Chat and Reasoner models",
+    description: "DeepSeek V4 Pro and V4 Flash models",
     allowsCustomModel: false,
-    defaultModel: "deepseek-chat",
+    defaultModel: "deepseek-v4-flash",
     requiresEndpointUrl: false,
   },
   {
     id: "perplexity",
     name: "Perplexity",
-    description: "Sonar models with search capabilities",
+    description: "Sonar models with live web search grounding",
     allowsCustomModel: false,
     defaultModel: "sonar",
     requiresEndpointUrl: false,
@@ -157,108 +175,112 @@ export const PROVIDERS: ProviderConfig[] = [
 
 export const PROVIDER_MODELS: Record<LlmProvider, string[]> = {
   openai: [
+    // GPT-5.6 family (July 2026) - 1.05M context
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    // GPT-5.5 / 5.4
+    "gpt-5.5",
     "gpt-5.4",
     "gpt-5.4-mini",
     "gpt-5.4-nano",
+    // GPT-5
     "gpt-5",
     "gpt-5-mini",
     "gpt-5-nano",
+    // GPT-4 family
     "gpt-4.1",
     "gpt-4.1-mini",
     "gpt-4.1-nano",
     "gpt-4o",
     "gpt-4o-mini",
-    "o3",
-    "o3-pro",
-    "o4-mini",
   ],
   anthropic: [
+    // Current generation
+    "claude-fable-5",
+    "claude-opus-5",
+    "claude-sonnet-5",
+    "claude-haiku-4-5",
+    // Still available, superseded
+    "claude-opus-4-8",
     "claude-opus-4-7",
-    "claude-opus-4-6-20260205",
-    "claude-sonnet-4-6-20260217",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
     "claude-opus-4-5-20251101",
     "claude-sonnet-4-5-20250929",
-    "claude-haiku-4-5-20251001",
-    "claude-opus-4-1-20250805",
   ],
   gemini: [
+    // Gemini 3 series (stable)
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
     "gemini-3.5-flash",
-    "gemini-3.1-pro-preview",
+    "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
-    "gemini-3.1-flash-image-preview",
+    // Preview
+    "gemini-3.1-pro-preview",
     "gemini-3-flash-preview",
-    "gemini-3-pro-image-preview",
+    // Image generation (Nano Banana)
+    "gemini-3.1-flash-image",
+    "gemini-3.1-flash-lite-image",
+    "gemini-3-pro-image",
+    // Gemini 2.5 series
     "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash-image",
-    "gemini-2.5-flash-native-audio-preview",
-    "imagen-4.0-generate-001",
-    "imagen-4.0-ultra-generate-001",
-    "imagen-4.0-fast-generate-001",
+    "gemini-2.5-flash-native-audio-preview-12-2025",
+    // Video generation
     "veo-3.1-generate-preview",
+    "veo-3.1-lite-generate-preview",
   ],
   mistral: [
-    "mistral-large-2512",
     "mistral-large-latest",
-    "mistral-medium-3.1",
+    "mistral-large-2512",
     "mistral-medium-latest",
-    "mistral-small-2603",
     "mistral-small-latest",
-    "ministral-3b-2512",
-    "ministral-8b-2512",
+    "mistral-small-2603",
     "ministral-14b-2512",
-    "devstral-2512",
-    "codestral-2508",
+    "ministral-8b-2512",
+    "ministral-3b-2512",
     "codestral-latest",
-    "magistral-medium-2509",
-    "magistral-small-2509",
-    "magistral-medium-latest",
-    "magistral-small-latest",
-    "voxtral-small",
-    "voxtral-mini",
-    "mistral-ocr-2512",
+    "codestral-2508",
+    "mistral-ocr-latest",
   ],
   cohere: [
+    "command-a-plus-05-2026",
     "command-a-03-2025",
     "command-a-reasoning-08-2025",
     "command-a-vision-07-2025",
     "command-a-translate-08-2025",
-    "command-a-plus-05-2026",
     "command-r7b-12-2024",
     "command-r-plus-08-2024",
     "command-r-08-2024",
   ],
   groq: [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "meta-llama/llama-4-scout-17b-16e-instruct",
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
-    "qwen/qwen3-32b",
+    "qwen/qwen3.6-27b",
+    "minimaxai/minimax-m2.7",
     "groq/compound",
     "groq/compound-mini",
+    // Audio transcription (two-stage pipeline with transcription_extraction_model)
     "whisper-large-v3",
     "whisper-large-v3-turbo",
   ],
   xai: [
+    "grok-4.6",
+    "grok-4.5",
     "grok-4.3",
     "grok-4.20-0309-reasoning",
     "grok-4.20-0309-non-reasoning",
     "grok-4.20-multi-agent-0309",
-    "grok-4-1-fast-reasoning",
-    "grok-4-1-fast-non-reasoning",
-    "grok-code-fast-1",
+    "grok-build-0.1",
   ],
-  deepseek: [
-    "deepseek-v4-flash",
-    "deepseek-v4-pro",
-    "deepseek-chat",
-    "deepseek-reasoner",
-  ],
+  deepseek: ["deepseek-v4-pro", "deepseek-v4-flash"],
   perplexity: [
     "sonar",
     "sonar-pro",
+    "sonar-pro-search",
     "sonar-reasoning-pro",
     "sonar-deep-research",
   ],
@@ -313,9 +335,76 @@ export const PROVIDER_MODELS: Record<LlmProvider, string[]> = {
 // =============================================================================
 
 export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
-  // ===========================================================================
-  // OpenAI
-  // ===========================================================================
+  // OpenAI — https://developers.openai.com/api/docs/models
+  "gpt-5.6-sol": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "gpt-5.6-terra": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "gpt-5.6-luna": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "gpt-5.5": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "gpt-5.4": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "gpt-5.4-mini": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "gpt-5.4-nano": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
   "gpt-5": {
     visionInput: true,
     audioInput: false,
@@ -343,34 +432,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
-  },
-  "gpt-5.4": {
-    visionInput: true,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
-  },
-  "gpt-5.4-mini": {
-    visionInput: true,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    webSearch: true,
-    mediaFormats: { imageFormats: ["url", "base64"] },
-  },
-  "gpt-5.4-nano": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
   },
   "gpt-4.1": {
     visionInput: true,
@@ -389,75 +451,83 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
-    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "gpt-4.1-nano": {
-    visionInput: false,
+    visionInput: true,
     audioInput: false,
     videoInput: false,
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "gpt-4o": {
     visionInput: true,
-    audioInput: true,
+    audioInput: false,
     videoInput: false,
     imageOutput: false,
-    audioOutput: true,
+    audioOutput: false,
     videoOutput: false,
-    mediaFormats: {
-      imageFormats: ["url", "base64"],
-      audioFormats: ["base64", "file"],
-    },
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "gpt-4o-mini": {
     visionInput: true,
-    audioInput: true,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: true,
-    videoOutput: false,
-    mediaFormats: {
-      imageFormats: ["url", "base64"],
-      audioFormats: ["base64", "file"],
-    },
-  },
-  o3: {
-    visionInput: true,
     audioInput: false,
     videoInput: false,
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
-    webSearch: true,
-    mediaFormats: { imageFormats: ["url", "base64"] },
-  },
-  "o3-pro": {
-    visionInput: true,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    webSearch: true,
-    mediaFormats: { imageFormats: ["url", "base64"] },
-  },
-  "o4-mini": {
-    visionInput: true,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
 
-  // ===========================================================================
-  // Anthropic
-  // ===========================================================================
+  // Anthropic — https://platform.claude.com/docs/en/about-claude/models/overview
+  "claude-fable-5": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "claude-opus-5": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "claude-sonnet-5": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "claude-haiku-4-5": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "claude-opus-4-8": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
   "claude-opus-4-7": {
     visionInput: true,
     audioInput: false,
@@ -467,7 +537,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
-  "claude-opus-4-6-20260205": {
+  "claude-opus-4-6": {
     visionInput: true,
     audioInput: false,
     videoInput: false,
@@ -476,7 +546,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
-  "claude-sonnet-4-6-20260217": {
+  "claude-sonnet-4-6": {
     visionInput: true,
     audioInput: false,
     videoInput: false,
@@ -503,28 +573,36 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
-  "claude-haiku-4-5-20251001": {
-    visionInput: true,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    mediaFormats: { imageFormats: ["url", "base64"] },
-  },
-  "claude-opus-4-1-20250805": {
-    visionInput: true,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    mediaFormats: { imageFormats: ["url", "base64"] },
-  },
 
-  // ===========================================================================
-  // Google Gemini
-  // ===========================================================================
+  // Google Gemini — https://ai.google.dev/gemini-api/docs/models
+  "gemini-3.7-flash": {
+    visionInput: true,
+    audioInput: true,
+    videoInput: true,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: {
+      imageFormats: ["url", "base64", "gcs"],
+      audioFormats: ["url", "base64", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
+    },
+  },
+  "gemini-3.6-flash": {
+    visionInput: true,
+    audioInput: true,
+    videoInput: true,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: {
+      imageFormats: ["url", "base64", "gcs"],
+      audioFormats: ["url", "base64", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
+    },
+  },
   "gemini-3.5-flash": {
     visionInput: true,
     audioInput: true,
@@ -536,10 +614,10 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: {
       imageFormats: ["url", "base64", "gcs"],
       audioFormats: ["url", "base64", "gcs"],
-      videoFormats: ["url", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
     },
   },
-  "gemini-3.1-pro-preview": {
+  "gemini-3.5-flash-lite": {
     visionInput: true,
     audioInput: true,
     videoInput: true,
@@ -549,7 +627,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: {
       imageFormats: ["url", "base64", "gcs"],
       audioFormats: ["url", "base64", "gcs"],
-      videoFormats: ["url", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
     },
   },
   "gemini-3.1-flash-lite": {
@@ -562,17 +640,22 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: {
       imageFormats: ["url", "base64", "gcs"],
       audioFormats: ["url", "base64", "gcs"],
-      videoFormats: ["url", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
     },
   },
-  "gemini-3.1-flash-image-preview": {
+  "gemini-3.1-pro-preview": {
     visionInput: true,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: true,
+    audioInput: true,
+    videoInput: true,
+    imageOutput: false,
     audioOutput: false,
     videoOutput: false,
-    mediaFormats: { imageFormats: ["url", "base64", "gcs"] },
+    webSearch: true,
+    mediaFormats: {
+      imageFormats: ["url", "base64", "gcs"],
+      audioFormats: ["url", "base64", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
+    },
   },
   "gemini-3-flash-preview": {
     visionInput: true,
@@ -584,10 +667,28 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: {
       imageFormats: ["url", "base64", "gcs"],
       audioFormats: ["url", "base64", "gcs"],
-      videoFormats: ["url", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
     },
   },
-  "gemini-3-pro-image-preview": {
+  "gemini-3.1-flash-image": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: true,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64", "gcs"] },
+  },
+  "gemini-3.1-flash-lite-image": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: true,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64", "gcs"] },
+  },
+  "gemini-3-pro-image": {
     visionInput: true,
     audioInput: false,
     videoInput: false,
@@ -606,7 +707,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: {
       imageFormats: ["url", "base64", "gcs"],
       audioFormats: ["url", "base64", "gcs"],
-      videoFormats: ["url", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
     },
   },
   "gemini-2.5-flash": {
@@ -619,7 +720,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: {
       imageFormats: ["url", "base64", "gcs"],
       audioFormats: ["url", "base64", "gcs"],
-      videoFormats: ["url", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
     },
   },
   "gemini-2.5-flash-lite": {
@@ -632,7 +733,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: {
       imageFormats: ["url", "base64", "gcs"],
       audioFormats: ["url", "base64", "gcs"],
-      videoFormats: ["url", "gcs"],
+      videoFormats: ["url", "base64", "gcs"],
     },
   },
   "gemini-2.5-flash-image": {
@@ -644,42 +745,17 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["url", "base64", "gcs"] },
   },
-  "gemini-2.5-flash-native-audio-preview": {
+  "gemini-2.5-flash-native-audio-preview-12-2025": {
     visionInput: true,
     audioInput: true,
-    videoInput: true,
+    videoInput: false,
     imageOutput: false,
     audioOutput: true,
     videoOutput: false,
     mediaFormats: {
       imageFormats: ["url", "base64", "gcs"],
       audioFormats: ["url", "base64", "gcs"],
-      videoFormats: ["url", "gcs"],
     },
-  },
-  "imagen-4.0-generate-001": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: true,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "imagen-4.0-ultra-generate-001": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: true,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "imagen-4.0-fast-generate-001": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: true,
-    audioOutput: false,
-    videoOutput: false,
   },
   "veo-3.1-generate-preview": {
     visionInput: true,
@@ -690,19 +766,17 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: true,
     mediaFormats: { imageFormats: ["url", "base64", "gcs"] },
   },
-
-  // ===========================================================================
-  // Mistral
-  // ===========================================================================
-  "mistral-large-2512": {
+  "veo-3.1-lite-generate-preview": {
     visionInput: true,
     audioInput: false,
     videoInput: false,
     imageOutput: false,
     audioOutput: false,
-    videoOutput: false,
-    mediaFormats: { imageFormats: ["url", "base64"] },
+    videoOutput: true,
+    mediaFormats: { imageFormats: ["url", "base64", "gcs"] },
   },
+
+  // Mistral — https://docs.mistral.ai/getting-started/models/models_overview/
   "mistral-large-latest": {
     visionInput: true,
     audioInput: false,
@@ -712,23 +786,16 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
-  "mistral-medium-3.1": {
-    visionInput: false,
+  "mistral-large-2512": {
+    visionInput: true,
     audioInput: false,
     videoInput: false,
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "mistral-medium-latest": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "mistral-small-2603": {
     visionInput: true,
     audioInput: false,
     videoInput: false,
@@ -745,15 +812,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     audioOutput: false,
     videoOutput: false,
   },
-  "ministral-3b-2512": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "ministral-8b-2512": {
+  "mistral-small-2603": {
     visionInput: false,
     audioInput: false,
     videoInput: false,
@@ -762,14 +821,33 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
   },
   "ministral-14b-2512": {
-    visionInput: false,
+    visionInput: true,
     audioInput: false,
     videoInput: false,
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
   },
-  "devstral-2512": {
+  "ministral-8b-2512": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "ministral-3b-2512": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "codestral-latest": {
     visionInput: false,
     audioInput: false,
     videoInput: false,
@@ -785,65 +863,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     audioOutput: false,
     videoOutput: false,
   },
-  "codestral-latest": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "magistral-medium-2509": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "magistral-small-2509": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "magistral-medium-latest": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "magistral-small-latest": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "voxtral-small": {
-    visionInput: false,
-    audioInput: true,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    mediaFormats: { audioFormats: ["url", "base64"] },
-  },
-  "voxtral-mini": {
-    visionInput: false,
-    audioInput: true,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    mediaFormats: { audioFormats: ["url", "base64"] },
-  },
-  "mistral-ocr-2512": {
+  "mistral-ocr-latest": {
     visionInput: true,
     audioInput: false,
     videoInput: false,
@@ -853,9 +873,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
 
-  // ===========================================================================
-  // Cohere
-  // ===========================================================================
+  // Cohere — https://docs.cohere.com/docs/models
   "command-a-plus-05-2026": {
     visionInput: true,
     audioInput: false,
@@ -923,58 +941,8 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
   },
 
-  // ===========================================================================
-  // Groq
-  // ===========================================================================
-  "llama-3.3-70b-versatile": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "llama-3.1-8b-instant": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
+  // Groq — https://console.groq.com/docs/models
   "openai/gpt-oss-120b": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "openai/gpt-oss-20b": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "groq/compound": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "groq/compound-mini": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "meta-llama/llama-4-scout-17b-16e-instruct": {
     visionInput: true,
     audioInput: false,
     videoInput: false,
@@ -983,13 +951,50 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
-  "qwen/qwen3-32b": {
+  "openai/gpt-oss-20b": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "qwen/qwen3.6-27b": {
     visionInput: false,
     audioInput: false,
     videoInput: false,
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+  },
+  "minimaxai/minimax-m2.7": {
+    visionInput: false,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+  },
+  "groq/compound": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "groq/compound-mini": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "whisper-large-v3": {
     visionInput: false,
@@ -1010,9 +1015,27 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     mediaFormats: { audioFormats: ["file"] },
   },
 
-  // ===========================================================================
-  // xAI Grok
-  // ===========================================================================
+  // xAI — https://docs.x.ai/docs/models
+  "grok-4.6": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
+  "grok-4.5": {
+    visionInput: true,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
+    mediaFormats: { imageFormats: ["url", "base64"] },
+  },
   "grok-4.3": {
     visionInput: true,
     audioInput: false,
@@ -1020,6 +1043,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "grok-4.20-0309-reasoning": {
@@ -1029,6 +1053,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "grok-4.20-0309-non-reasoning": {
@@ -1038,6 +1063,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
   "grok-4.20-multi-agent-0309": {
@@ -1047,46 +1073,21 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
   },
-  "grok-4-1-fast-reasoning": {
+  "grok-build-0.1": {
     visionInput: true,
     audioInput: false,
     videoInput: false,
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
     mediaFormats: { imageFormats: ["url", "base64"] },
-  },
-  "grok-4-1-fast-non-reasoning": {
-    visionInput: true,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-    mediaFormats: { imageFormats: ["url", "base64"] },
-  },
-  "grok-code-fast-1": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
   },
 
-  // ===========================================================================
-  // DeepSeek
-  // ===========================================================================
-  "deepseek-v4-flash": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
+  // DeepSeek — https://api-docs.deepseek.com/quick_start/pricing (standard, cache miss)
   "deepseek-v4-pro": {
     visionInput: false,
     audioInput: false,
@@ -1095,15 +1096,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     audioOutput: false,
     videoOutput: false,
   },
-  "deepseek-chat": {
-    visionInput: false,
-    audioInput: false,
-    videoInput: false,
-    imageOutput: false,
-    audioOutput: false,
-    videoOutput: false,
-  },
-  "deepseek-reasoner": {
+  "deepseek-v4-flash": {
     visionInput: false,
     audioInput: false,
     videoInput: false,
@@ -1112,9 +1105,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
   },
 
-  // ===========================================================================
-  // Perplexity
-  // ===========================================================================
+  // Perplexity — https://docs.perplexity.ai (per-request search fees are billed separately)
   sonar: {
     visionInput: false,
     audioInput: false,
@@ -1122,6 +1113,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
   },
   "sonar-pro": {
     visionInput: false,
@@ -1130,6 +1122,16 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
+  },
+  "sonar-pro-search": {
+    visionInput: false,
+    audioInput: false,
+    videoInput: false,
+    imageOutput: false,
+    audioOutput: false,
+    videoOutput: false,
+    webSearch: true,
   },
   "sonar-reasoning-pro": {
     visionInput: false,
@@ -1138,6 +1140,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
   },
   "sonar-deep-research": {
     visionInput: false,
@@ -1146,12 +1149,10 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     imageOutput: false,
     audioOutput: false,
     videoOutput: false,
+    webSearch: true,
   },
 
-  // ===========================================================================
-  // LM Studio / Local Models (API uses just model name as identifier)
-  // ===========================================================================
-  // Text-only models
+  // LM Studio / custom OpenAI-compatible servers — self-hosted, no per-token cost
   "qwen3-8b": {
     visionInput: false,
     audioInput: false,
@@ -1200,7 +1201,6 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     audioOutput: false,
     videoOutput: false,
   },
-  // Vision models - Google Gemma 3
   "gemma-3-4b-it": {
     visionInput: true,
     audioInput: false,
@@ -1228,7 +1228,6 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  // Vision models - Qwen2.5-VL (excellent object recognition, 128k context)
   "qwen2.5-vl-3b-instruct": {
     visionInput: true,
     audioInput: false,
@@ -1265,7 +1264,6 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  // Vision models - GLM-4V (optimized for local deployment)
   "glm-4v-9b": {
     visionInput: true,
     audioInput: false,
@@ -1275,7 +1273,6 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  // Vision models - Pixtral (Mistral's vision model)
   "pixtral-12b-2409": {
     visionInput: true,
     audioInput: false,
@@ -1285,7 +1282,6 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  // Vision models - olmOCR 2 (specialized for OCR)
   "olmocr-2-7b-1025": {
     visionInput: true,
     audioInput: false,
@@ -1295,7 +1291,6 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     videoOutput: false,
     mediaFormats: { imageFormats: ["base64"] },
   },
-  // Vision models - DeepSeek Janus-Pro (visual QA, scene interpretation)
   "janus-pro-7b": {
     visionInput: true,
     audioInput: false,
@@ -1312,10 +1307,14 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
 // =============================================================================
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  // OpenAI
-  "gpt-5.4": { input: 250, output: 1000 },
-  "gpt-5.4-mini": { input: 40, output: 160 },
-  "gpt-5.4-nano": { input: 10, output: 40 },
+  // OpenAI — https://developers.openai.com/api/docs/models
+  "gpt-5.6-sol": { input: 500, output: 3000 },
+  "gpt-5.6-terra": { input: 200, output: 1200 },
+  "gpt-5.6-luna": { input: 20, output: 120 },
+  "gpt-5.5": { input: 500, output: 3000 },
+  "gpt-5.4": { input: 250, output: 1500 },
+  "gpt-5.4-mini": { input: 75, output: 450 },
+  "gpt-5.4-nano": { input: 20, output: 125 },
   "gpt-5": { input: 125, output: 1000 },
   "gpt-5-mini": { input: 25, output: 200 },
   "gpt-5-nano": { input: 5, output: 40 },
@@ -1324,20 +1323,34 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   "gpt-4.1-nano": { input: 10, output: 40 },
   "gpt-4o": { input: 250, output: 1000 },
   "gpt-4o-mini": { input: 15, output: 60 },
-  o3: { input: 1000, output: 4000 },
-  "o3-pro": { input: 2000, output: 8000 },
-  "o4-mini": { input: 110, output: 440 },
 
-  // Anthropic
+  // Anthropic — https://platform.claude.com/docs/en/about-claude/models/overview
+  "claude-fable-5": { input: 1000, output: 5000 },
+  "claude-opus-5": { input: 500, output: 2500 },
+  "claude-sonnet-5": { input: 200, output: 1000 },
+  "claude-haiku-4-5": { input: 100, output: 500 },
+  "claude-opus-4-8": { input: 500, output: 2500 },
   "claude-opus-4-7": { input: 500, output: 2500 },
-  "claude-opus-4-6-20260205": { input: 500, output: 2500 },
-  "claude-sonnet-4-6-20260217": { input: 300, output: 1500 },
+  "claude-opus-4-6": { input: 500, output: 2500 },
+  "claude-sonnet-4-6": { input: 300, output: 1500 },
   "claude-opus-4-5-20251101": { input: 500, output: 2500 },
   "claude-sonnet-4-5-20250929": { input: 300, output: 1500 },
-  "claude-haiku-4-5-20251001": { input: 100, output: 500 },
-  "claude-opus-4-1-20250805": { input: 1500, output: 7500 },
 
-  // Gemini
+  // Google Gemini — https://ai.google.dev/gemini-api/docs/models
+  "gemini-3.7-flash": {
+    input: 75,
+    output: 375,
+    imageInput: 39,
+    audioInput: 10,
+    videoInput: 39,
+  },
+  "gemini-3.6-flash": {
+    input: 75,
+    output: 375,
+    imageInput: 39,
+    audioInput: 10,
+    videoInput: 39,
+  },
   "gemini-3.5-flash": {
     input: 150,
     output: 900,
@@ -1345,12 +1358,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     audioInput: 10,
     videoInput: 39,
   },
-  "gemini-3.1-pro-preview": {
-    input: 125,
-    output: 1000,
-    imageInput: 32.9,
-    audioInput: 10,
-    videoInput: 32.9,
+  "gemini-3.5-flash-lite": {
+    input: 30,
+    output: 250,
+    imageInput: 30,
+    audioInput: 50,
+    videoInput: 30,
   },
   "gemini-3.1-flash-lite": {
     input: 25,
@@ -1359,15 +1372,38 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     audioInput: 50,
     videoInput: 25,
   },
-  "gemini-3.1-flash-image-preview": { input: 15, output: 60, imageInput: 3.9 },
-  "gemini-3-flash-preview": {
-    input: 15,
-    output: 60,
-    imageInput: 3.9,
-    audioInput: 1,
-    videoInput: 3.9,
+  "gemini-3.1-pro-preview": {
+    input: 200,
+    output: 1200,
+    imageInput: 32.9,
+    audioInput: 10,
+    videoInput: 32.9,
   },
-  "gemini-3-pro-image-preview": { input: 125, output: 1000, imageInput: 32.9 },
+  "gemini-3-flash-preview": {
+    input: 75,
+    output: 375,
+    imageInput: 39,
+    audioInput: 10,
+    videoInput: 39,
+  },
+  "gemini-3.1-flash-image": {
+    input: 75,
+    output: 375,
+    imageInput: 39,
+    imageOutput: 3.9,
+  }, // Nano Banana 2
+  "gemini-3.1-flash-lite-image": {
+    input: 25,
+    output: 150,
+    imageInput: 25,
+    imageOutput: 2.4,
+  }, // Nano Banana 2 Lite
+  "gemini-3-pro-image": {
+    input: 125,
+    output: 1000,
+    imageInput: 32.9,
+    imageOutput: 12,
+  }, // Nano Banana Pro
   "gemini-2.5-pro": {
     input: 125,
     output: 1000,
@@ -1376,97 +1412,88 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     videoInput: 32.9,
   },
   "gemini-2.5-flash": {
-    input: 15,
-    output: 60,
-    imageInput: 3.9,
-    audioInput: 1,
-    videoInput: 3.9,
+    input: 30,
+    output: 250,
+    imageInput: 30,
+    audioInput: 100,
+    videoInput: 30,
   },
   "gemini-2.5-flash-lite": {
-    input: 7.5,
-    output: 30,
-    imageInput: 2,
-    audioInput: 0.5,
-    videoInput: 2,
+    input: 10,
+    output: 40,
+    imageInput: 10,
+    audioInput: 30,
+    videoInput: 10,
   },
-  "gemini-2.5-flash-image": { input: 15, output: 60, imageInput: 3.9 },
-  "gemini-2.5-flash-native-audio-preview": {
-    input: 15,
-    output: 60,
-    imageInput: 3.9,
-    audioInput: 1,
-    videoInput: 3.9,
+  "gemini-2.5-flash-image": {
+    input: 30,
+    output: 250,
+    imageInput: 30,
+    imageOutput: 3.9,
   },
-  "imagen-4.0-generate-001": { input: 0, output: 0, imageOutput: 4000 },
-  "imagen-4.0-ultra-generate-001": { input: 0, output: 0, imageOutput: 6000 },
-  "imagen-4.0-fast-generate-001": { input: 0, output: 0, imageOutput: 2000 },
-  "veo-3.1-generate-preview": { input: 0, output: 0, videoOutput: 40000 },
+  "gemini-2.5-flash-native-audio-preview-12-2025": {
+    input: 30,
+    output: 250,
+    audioInput: 100,
+    audioOutput: 200,
+  },
+  "veo-3.1-generate-preview": { input: 0, output: 0, videoOutput: 4000 }, // priced per second of video
+  "veo-3.1-lite-generate-preview": { input: 0, output: 0, videoOutput: 1500 }, // priced per second of video
 
-  // Mistral
-  "mistral-large-2512": { input: 200, output: 600 },
-  "mistral-large-latest": { input: 200, output: 600 },
-  "mistral-medium-3.1": { input: 40, output: 120 },
-  "mistral-medium-latest": { input: 40, output: 120 },
-  "mistral-small-2603": { input: 10, output: 30 },
-  "mistral-small-latest": { input: 10, output: 30 },
-  "ministral-3b-2512": { input: 4, output: 4 },
-  "ministral-8b-2512": { input: 10, output: 10 },
-  "ministral-14b-2512": { input: 15, output: 15 },
-  "devstral-2512": { input: 30, output: 90 },
-  "codestral-2508": { input: 30, output: 90 },
+  // Mistral — https://docs.mistral.ai/getting-started/models/models_overview/
+  "mistral-large-latest": { input: 50, output: 150 },
+  "mistral-large-2512": { input: 50, output: 150 },
+  "mistral-medium-latest": { input: 150, output: 750 },
+  "mistral-small-latest": { input: 15, output: 60 },
+  "mistral-small-2603": { input: 15, output: 60 },
+  "ministral-14b-2512": { input: 20, output: 20 },
+  "ministral-8b-2512": { input: 15, output: 15 },
+  "ministral-3b-2512": { input: 10, output: 10 },
   "codestral-latest": { input: 30, output: 90 },
-  "magistral-medium-2509": { input: 200, output: 600 },
-  "magistral-small-2509": { input: 10, output: 30 },
-  "magistral-medium-latest": { input: 200, output: 600 },
-  "magistral-small-latest": { input: 10, output: 30 },
-  "voxtral-small": { input: 200, output: 600 },
-  "voxtral-mini": { input: 10, output: 30 },
-  "mistral-ocr-2512": { input: 100, output: 100 },
+  "codestral-2508": { input: 30, output: 90 },
+  "mistral-ocr-latest": { input: 100, output: 300 }, // document OCR
 
-  // Cohere
+  // Cohere — https://docs.cohere.com/docs/models
   "command-a-plus-05-2026": { input: 250, output: 1000 },
   "command-a-03-2025": { input: 250, output: 1000 },
   "command-a-reasoning-08-2025": { input: 250, output: 1000 },
   "command-a-vision-07-2025": { input: 250, output: 1000 },
   "command-a-translate-08-2025": { input: 250, output: 1000 },
-  "command-r7b-12-2024": { input: 7.5, output: 30 },
+  "command-r7b-12-2024": { input: 3.75, output: 15 },
   "command-r-plus-08-2024": { input: 250, output: 1000 },
   "command-r-08-2024": { input: 15, output: 60 },
 
-  // Groq
-  "llama-3.3-70b-versatile": { input: 59, output: 79 },
-  "llama-3.1-8b-instant": { input: 5, output: 8 },
-  "openai/gpt-oss-120b": { input: 30, output: 40 },
-  "openai/gpt-oss-20b": { input: 30, output: 40 },
-  "groq/compound": { input: 20, output: 50 },
-  "groq/compound-mini": { input: 2, output: 4 },
-  "meta-llama/llama-4-scout-17b-16e-instruct": { input: 11, output: 34 },
-  "qwen/qwen3-32b": { input: 6, output: 6 },
-  "whisper-large-v3": { input: 11, output: 0 },
-  "whisper-large-v3-turbo": { input: 4, output: 0 },
+  // Groq — https://console.groq.com/docs/models
+  "openai/gpt-oss-120b": { input: 15, output: 75 },
+  "openai/gpt-oss-20b": { input: 10, output: 50 },
+  "qwen/qwen3.6-27b": { input: 29, output: 59 },
+  "minimaxai/minimax-m2.7": { input: 29, output: 115 },
+  "groq/compound": { input: 15, output: 75 },
+  "groq/compound-mini": { input: 10, output: 50 },
+  "whisper-large-v3": { input: 11, output: 0 }, // per hour of audio
+  "whisper-large-v3-turbo": { input: 4, output: 0 }, // per hour of audio
 
-  // xAI
+  // xAI — https://docs.x.ai/docs/models
+  "grok-4.6": { input: 200, output: 600 },
+  "grok-4.5": { input: 200, output: 600 },
   "grok-4.3": { input: 125, output: 250 },
   "grok-4.20-0309-reasoning": { input: 125, output: 250 },
   "grok-4.20-0309-non-reasoning": { input: 125, output: 250 },
   "grok-4.20-multi-agent-0309": { input: 125, output: 250 },
-  "grok-4-1-fast-reasoning": { input: 200, output: 1000 },
-  "grok-4-1-fast-non-reasoning": { input: 200, output: 1000 },
-  "grok-code-fast-1": { input: 200, output: 1000 },
+  "grok-build-0.1": { input: 100, output: 200 },
 
-  // DeepSeek
-  "deepseek-v4-flash": { input: 14, output: 28 },
-  "deepseek-v4-pro": { input: 44, output: 87 },
-  "deepseek-chat": { input: 14, output: 28 },
-  "deepseek-reasoner": { input: 55, output: 219 },
+  // DeepSeek — https://api-docs.deepseek.com/quick_start/pricing (standard, cache miss)
+  "deepseek-v4-pro": { input: 66, output: 198 },
+  "deepseek-v4-flash": { input: 22, output: 66 },
 
-  // Perplexity
+  // Perplexity — https://docs.perplexity.ai (per-request search fees are billed separately)
   sonar: { input: 100, output: 100 },
-  "sonar-pro": { input: 300, output: 300 },
-  "sonar-reasoning-pro": { input: 800, output: 800 },
-  "sonar-deep-research": { input: 1200, output: 1200 },
+  "sonar-pro": { input: 300, output: 1500 },
+  "sonar-pro-search": { input: 300, output: 1500 },
+  "sonar-reasoning-pro": { input: 200, output: 800 },
+  "sonar-deep-research": { input: 200, output: 800 },
 
-  // LM Studio (notional pricing - local models are free, pricing for cost tracking)
+  // LM Studio / custom OpenAI-compatible servers — self-hosted, no per-token cost
   "qwen3-8b": { input: 0, output: 0 },
   "qwen3-14b": { input: 0, output: 0 },
   "qwen3-30b-a3b": { input: 0, output: 0 },

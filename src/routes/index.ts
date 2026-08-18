@@ -19,6 +19,7 @@ import invitationsRouter from "./invitations";
 import providersRouter from "./providers";
 import storageRouter from "./storage";
 import usersRouter from "./users";
+import userApiKeysRouter from "./user-api-keys";
 
 const routes = new Hono();
 
@@ -40,6 +41,7 @@ adminRoutes.route(
 adminRoutes.route("/entities/:entitySlug/analytics", analyticsRouter);
 adminRoutes.route("/ratelimits/:rateLimitUserId", ratelimitsRouter);
 adminRoutes.route("/users/:userId/settings", settingsRouter);
+adminRoutes.route("/users/:userId/api-keys", userApiKeysRouter);
 adminRoutes.route("/entities", entitiesRouter);
 adminRoutes.route("/invitations", invitationsRouter);
 adminRoutes.route("/users", usersRouter);
@@ -61,4 +63,5 @@ export {
   providersRouter,
   storageRouter,
   usersRouter,
+  userApiKeysRouter,
 };

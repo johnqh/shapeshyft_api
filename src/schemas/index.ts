@@ -245,6 +245,24 @@ export const analyticsQuerySchema = z.object({
 });
 
 // =============================================================================
+// User API Key Schemas
+// =============================================================================
+
+export const apiKeyIdParamSchema = z.object({
+  userId: z.string().min(1).max(128),
+  keyId: z.string().uuid(),
+});
+
+export const userApiKeyCreateSchema = z.object({
+  key_name: z.string().min(1).max(255),
+});
+
+export const userApiKeyUpdateSchema = z.object({
+  key_name: z.string().min(1).max(255).optional(),
+  is_active: z.boolean().optional(),
+});
+
+// =============================================================================
 // Settings Schemas
 // =============================================================================
 

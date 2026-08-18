@@ -125,6 +125,42 @@ export const entityStorageConfigs = shapeshyftSchema.table(
 );
 
 // =============================================================================
+// User API Keys Table
+// Personal API keys ("shyft_...") that authenticate a user against the admin
+// routes exactly as a Firebase ID token does. A user may hold several.
+// Looked up by SHA-256 hash; the encrypted copy exists so the owner can reveal
+// the key again from the dashboard.
+// =============================================================================
+
+export const userApiKeys = shapeshyftSchema.table(
+  "user_api_keys",
+  {
+    uuid: uuid("uuid").primaryKey().defaultRandom(),
+    firebase_uid: varchar("firebase_uid", { length: 128 })
+      .notNull()
+      .references(() => users.firebase_uid, { onDelete: "cascade" }),
+    key_name: varchar("key_name", { length: 255 }).notNull(),
+    /** SHA-256 hex digest of the key — the authentication lookup index */
+    key_hash: varchar("key_hash", { length: 64 }).notNull().unique(),
+    /** First characters of the key, for display in listings */
+    key_prefix: varchar("key_prefix", { length: 20 }).notNull(),
+    /** AES-256-CBC ciphertext so the owner can copy the key again */
+    encrypted_key: text("encrypted_key").notNull(),
+    encryption_iv: varchar("encryption_iv", { length: 32 }).notNull(),
+    is_active: boolean("is_active").default(true).notNull(),
+    last_used_at: timestamp("last_used_at"),
+    created_at: timestamp("created_at").defaultNow(),
+    updated_at: timestamp("updated_at").defaultNow(),
+  },
+  table => ({
+    userIdx: index("shapeshyft_user_api_keys_user_idx").on(table.firebase_uid),
+    hashIdx: uniqueIndex("shapeshyft_user_api_keys_hash_idx").on(
+      table.key_hash
+    ),
+  })
+);
+
+// =============================================================================
 // LLM API Keys Table
 // =============================================================================
 

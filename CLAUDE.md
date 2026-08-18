@@ -124,6 +124,7 @@ Uses PostgreSQL with a `shapeshyft` schema (not the default `public` schema).
 |-------|---------|-----|
 | `users` | Firebase UID mapping | `firebase_uid` (PK) |
 | `user_settings` | Organization settings | `firebase_uid` (FK, unique) |
+| `user_api_keys` | Personal API keys (`shyft_...`) | `firebase_uid` (FK), unique `key_hash` |
 | `entities` | Organizations/teams | `id` (UUID PK) |
 | `entity_members` | Entity membership roles | `entity_id` + `user_id` |
 | `entity_invitations` | Pending team invitations | `entity_id` + `email` |
@@ -205,6 +206,10 @@ All routes under `/api/v1/`:
 | GET | `/ratelimits/:rateLimitUserId/usage` | Rate limit usage history |
 | GET/PUT | `/users/:userId/settings` | User settings |
 | GET | `/users/:userId` | User info |
+| GET | `/users/me` | Authenticated caller (works with either auth method) |
+| GET/POST | `/users/:userId/api-keys` | List / create personal API keys |
+| GET/PUT/DELETE | `/users/:userId/api-keys/:keyId` | Personal API key CRUD |
+| GET | `/users/:userId/api-keys/:keyId/reveal` | Reveal the full key (Firebase token only) |
 | POST | `/invitations/:invitationId/accept` | Accept invitation |
 | POST | `/invitations/:invitationId/decline` | Decline invitation |
 | GET | `/invitations` | List pending invitations |
@@ -217,8 +222,12 @@ In `src/routes/index.ts`, public routes are registered **before** admin routes. 
 
 ### Auth Split
 
-- **Public routes** (`/ai/*`, `/providers/*`): Project API key authentication via `X-API-Key` header + optional IP allowlist
-- **Admin routes** (everything else): Firebase Bearer token authentication via `firebaseAuthMiddleware`
+- **Public routes** (`/ai/*`, `/providers/*`): Project API key (`sk_live_...`) via `Authorization: Bearer` or `?api_key=`, plus optional IP allowlist
+- **Admin routes** (everything else): `firebaseAuthMiddleware` accepts **either** credential:
+  1. A personal API key (`shyft_...`) from `X-API-Key` or `Authorization: Bearer`. Resolved by SHA-256 hash to its owner, then `userId` / `userEmail` / `siteAdmin` are set exactly as a token would set them — every downstream handler is identical.
+  2. A Firebase ID token from `Authorization: Bearer`.
+
+  `authMethod` (`"firebase"` | `"api_key"`) records which was used. `firebaseUser` is **only** set on the token path, so handlers must read `userId` / `userEmail`, never `firebaseUser`.
 
 ### LLM Provider Architecture
 
@@ -503,6 +512,10 @@ bun run test:setup && bun run test:integration
 - **Unit tests vs integration tests** -- `bun test` runs only `tests/unit/`. `bun run test:integration` needs a real database.
 - **Five `@sudobility/*` dependencies** -- version mismatches between them are the most common cause of type errors.
 - **Lazy Proxy-based db connection** -- the database is not connected at module load. First access triggers initialization. This is intentional for test isolation.
+- **Two key types, different jobs** -- `sk_live_...` is a *project* key that authenticates callers of a published AI endpoint; `shyft_...` is a *personal* key that authenticates its owner against the admin routes. The prefix is what routes an incoming credential, so never reuse one.
+- **Handlers must not read `firebaseUser`** -- it is undefined on API-key requests. Use `c.get("userId")` and `c.get("userEmail")`.
+- **API keys cannot mint API keys** -- create and reveal require a Firebase token (`authMethod === "api_key"` is rejected with 403), so a leaked key cannot bootstrap more credentials.
+- **User API key lookups are cached for 60s** -- a revoked key can keep working that long unless the revocation went through this API, which invalidates the entry immediately.
 - **Public AI routes use project API key auth** -- NOT Firebase auth. The `X-API-Key` header is validated via timing-safe comparison against encrypted stored keys.
 - **IP allowlist on endpoints** -- optional IPv4 allowlist. When set, requests from IPs not in the list are rejected.
 - **Provider factory reuses OpenAIProvider** -- Mistral, xAI, DeepSeek, Perplexity, and Cohere all use `OpenAIProvider` since they have OpenAI-compatible APIs.

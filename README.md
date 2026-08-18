@@ -22,12 +22,21 @@ curl -X POST https://api.shapeshyft.ai/api/v1/ai/org/project/endpoint/invoke \
 # Admin: List projects (Firebase auth)
 curl https://api.shapeshyft.ai/api/v1/entities/org/projects \
   -H "Authorization: Bearer <firebase-token>"
+
+# Admin: the same call with a personal API key
+curl https://api.shapeshyft.ai/api/v1/entities/org/projects \
+  -H "X-API-Key: shyft_..."
+
+# Create a personal API key (Firebase token required)
+curl -X POST https://api.shapeshyft.ai/api/v1/users/<uid>/api-keys \
+  -H "Authorization: Bearer <firebase-token>" -H "Content-Type: application/json" \
+  -d '{"key_name":"CLI"}'
 ```
 
 ## Routes
 
 - **Public** (`/api/v1/ai/*`, `/api/v1/providers/*`) -- AI inference and provider catalog (project API key auth)
-- **Admin** (`/api/v1/entities/*`, `/api/v1/users/*`) -- Full CRUD for entities, projects, endpoints, keys, analytics, settings (Firebase auth)
+- **Admin** (`/api/v1/entities/*`, `/api/v1/users/*`) -- Full CRUD for entities, projects, endpoints, keys, analytics, settings (Firebase ID token **or** a personal `shyft_...` API key)
 
 Supports 10 LLM providers: OpenAI, Anthropic, Gemini, Groq, Mistral, xAI, DeepSeek, Perplexity, Cohere, LM Studio.
 

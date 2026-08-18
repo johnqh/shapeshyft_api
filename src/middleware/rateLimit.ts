@@ -69,11 +69,12 @@ function getRateLimitMiddleware(): ReturnType<
       db: db as any,
       rateLimitsTable: rateLimitCounters as any,
       getUserId: (c: any) => {
-        const firebaseUser = c.get("firebaseUser");
-        if (!firebaseUser) {
-          throw new Error("Firebase user not found in context");
+        // Set by firebaseAuthMiddleware for both auth methods (token or API key)
+        const userId = c.get("userId");
+        if (!userId) {
+          throw new Error("Authenticated user not found in context");
         }
-        return firebaseUser.uid;
+        return userId;
       },
       getTestMode: (c: any) => {
         const url = new URL(c.req.url);

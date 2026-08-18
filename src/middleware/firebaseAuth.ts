@@ -11,6 +11,8 @@ import { verifyIdToken } from "../services/firebase";
 import { errorResponse } from "@sudobility/shapeshyft_types";
 import { eq } from "drizzle-orm";
 import { db, users } from "../db";
+import { extractUserApiKeyFromHeaders } from "../lib/user-api-key";
+import { resolveUserApiKey } from "../lib/user-api-key-cache";
 
 /**
  * Augment Hono's ContextVariableMap for type-safe context access.
@@ -21,6 +23,10 @@ declare module "hono" {
     userId: string;
     userEmail: string | null;
     siteAdmin: boolean;
+    /** How the caller authenticated. "api_key" requests have no firebaseUser. */
+    authMethod: "firebase" | "api_key";
+    /** UUID of the user API key used, when authMethod is "api_key" */
+    apiKeyId: string;
   }
 }
 
@@ -57,10 +63,36 @@ async function ensureUserExists(
  * Also ensures user record exists in database (fire-and-forget).
  */
 export async function firebaseAuthMiddleware(c: Context, next: Next) {
+  // 1. Personal API key ("shyft_..."), from X-API-Key or Authorization: Bearer.
+  // A resolved key sets exactly the same context variables a token would, minus
+  // firebaseUser, so every downstream handler behaves identically.
+  const userApiKey = extractUserApiKeyFromHeaders(name => c.req.header(name));
+  if (userApiKey) {
+    const resolved = await resolveUserApiKey(userApiKey);
+    if (!resolved) {
+      return c.json(errorResponse("Invalid or inactive API key"), 401);
+    }
+
+    c.set("userId", resolved.userId);
+    c.set("userEmail", resolved.userEmail);
+    c.set("siteAdmin", isSiteAdmin(resolved.userEmail));
+    c.set("authMethod", "api_key");
+    c.set("apiKeyId", resolved.keyId);
+
+    await next();
+    return;
+  }
+
+  // 2. Firebase ID token
   const authHeader = c.req.header("Authorization");
 
   if (!authHeader) {
-    return c.json(errorResponse("Authorization header required"), 401);
+    return c.json(
+      errorResponse(
+        "Authorization required. Provide a Firebase ID token as 'Authorization: Bearer <token>' or a personal API key as 'X-API-Key: shyft_...'"
+      ),
+      401
+    );
   }
 
   const [type, token] = authHeader.split(" ");
@@ -89,6 +121,7 @@ export async function firebaseAuthMiddleware(c: Context, next: Next) {
     c.set("userId", userId);
     c.set("userEmail", userEmail);
     c.set("siteAdmin", isSiteAdmin(userEmail));
+    c.set("authMethod", "firebase");
 
     // Ensure user exists in database (fire-and-forget)
     ensureUserExists(userId, userEmail).catch(err =>

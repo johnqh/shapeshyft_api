@@ -127,12 +127,12 @@ ratelimitsRouter.get("/", async c => {
       return c.json(successResponse<RateLimitsConfigData>(fallback));
     }
 
-    const firebaseUser = c.get("firebaseUser");
+    const userId = c.get("userId");
 
     // Get entity ID for rate limit lookup
     const { entityId, error: entityError } = await getEntityIdForRateLimits(
       c,
-      firebaseUser.uid
+      userId
     );
 
     if (entityError || !entityId) {
@@ -191,12 +191,12 @@ ratelimitsRouter.get("/history/:periodType", async c => {
     }
 
     const periodType = periodTypeParam as RateLimitPeriodType;
-    const firebaseUser = c.get("firebaseUser");
+    const userId = c.get("userId");
 
     // Get entity ID for rate limit lookup
     const { entityId, error: entityError } = await getEntityIdForRateLimits(
       c,
-      firebaseUser.uid
+      userId
     );
 
     if (entityError || !entityId) {

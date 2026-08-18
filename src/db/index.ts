@@ -135,6 +135,37 @@ export async function initDatabase() {
   });
 
   // =============================================================================
+  // Step 2b: Create user_api_keys table (references users.firebase_uid)
+  // Personal API keys used as an alternative to a Firebase ID token.
+  // =============================================================================
+
+  await client`
+    CREATE TABLE IF NOT EXISTS shapeshyft.user_api_keys (
+      uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      firebase_uid VARCHAR(128) NOT NULL REFERENCES shapeshyft.users(firebase_uid) ON DELETE CASCADE,
+      key_name VARCHAR(255) NOT NULL,
+      key_hash VARCHAR(64) NOT NULL UNIQUE,
+      key_prefix VARCHAR(20) NOT NULL,
+      encrypted_key TEXT NOT NULL,
+      encryption_iv VARCHAR(32) NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      last_used_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
+  await client`
+    CREATE INDEX IF NOT EXISTS shapeshyft_user_api_keys_user_idx
+      ON shapeshyft.user_api_keys(firebase_uid)
+  `;
+
+  await client`
+    CREATE UNIQUE INDEX IF NOT EXISTS shapeshyft_user_api_keys_hash_idx
+      ON shapeshyft.user_api_keys(key_hash)
+  `;
+
+  // =============================================================================
   // Step 3: Create llm_api_keys table (references entities.id)
   // =============================================================================
 

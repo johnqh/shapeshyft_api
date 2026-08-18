@@ -24,6 +24,40 @@ const usersRouter = new Hono();
  * Note: This route is under adminRoutes which applies firebaseAuthMiddleware,
  * so c.get("userId") is already available.
  */
+/**
+ * GET /users/me
+ *
+ * Identify the authenticated caller. Works with either auth method, and is the
+ * only way an API-key client can learn its own Firebase UID — which the
+ * /users/:userId/* routes require. Registered before "/:userId" so the literal
+ * "me" is not captured as a user id.
+ */
+usersRouter.get("/me", async c => {
+  const userId = c.get("userId");
+  const userEmail = c.get("userEmail");
+
+  // The display name is a nicety fetched from Firebase. Identity is already
+  // established by the middleware, so a Firebase outage (or an API-key caller on
+  // a deployment without Firebase reachable) must not fail this route.
+  let displayName: string | null = null;
+  try {
+    const userInfo = await getUserInfo(userId);
+    displayName = userInfo?.displayName ?? null;
+  } catch (error) {
+    console.error("Could not load Firebase profile for /users/me:", error);
+  }
+
+  return c.json(
+    successResponse({
+      firebase_uid: userId,
+      email: userEmail,
+      siteAdmin: c.get("siteAdmin") ?? false,
+      auth_method: c.get("authMethod") ?? "firebase",
+      display_name: displayName,
+    })
+  );
+});
+
 usersRouter.get("/:userId", async c => {
   const requestedUserId = c.req.param("userId");
   const tokenUserId = c.get("userId");

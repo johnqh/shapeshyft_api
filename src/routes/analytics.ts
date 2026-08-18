@@ -72,12 +72,12 @@ async function getEntityIdForAnalytics(
  * Returns analytics for a specific entity
  */
 analyticsRouter.get("/", zValidator("query", analyticsQuerySchema), async c => {
-  const firebaseUser = c.get("firebaseUser");
+  const userId = c.get("userId");
 
   // Get entity ID from path parameter
   const { entityId, error: entityError } = await getEntityIdForAnalytics(
     c,
-    firebaseUser.uid
+    userId
   );
 
   if (entityError || !entityId) {

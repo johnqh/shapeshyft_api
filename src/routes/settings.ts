@@ -51,14 +51,15 @@ function generateDefaultOrgPath(firebaseUid: string): string {
 
 // GET user settings
 settingsRouter.get("/", async c => {
-  const firebaseUser = c.get("firebaseUser");
+  const authUserId = c.get("userId");
+  const authUserEmail = c.get("userEmail");
   const userId = c.req.param("userId");
 
-  if (firebaseUser.uid !== userId) {
+  if (authUserId !== userId) {
     return c.json(errorResponse("You can only access your own settings"), 403);
   }
 
-  const user = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
+  const user = await getOrCreateUser(authUserId, authUserEmail ?? undefined);
 
   const rows = await db
     .select()
@@ -85,15 +86,16 @@ settingsRouter.get("/", async c => {
 
 // PUT create/update settings (upsert)
 settingsRouter.put("/", zValidator("json", settingsUpdateSchema), async c => {
-  const firebaseUser = c.get("firebaseUser");
+  const authUserId = c.get("userId");
+  const authUserEmail = c.get("userEmail");
   const userId = c.req.param("userId");
   const body = c.req.valid("json");
 
-  if (firebaseUser.uid !== userId) {
+  if (authUserId !== userId) {
     return c.json(errorResponse("You can only update your own settings"), 403);
   }
 
-  const user = await getOrCreateUser(firebaseUser.uid, firebaseUser.email);
+  const user = await getOrCreateUser(authUserId, authUserEmail ?? undefined);
 
   // Check if settings exist
   const existing = await db

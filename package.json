@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.119",
+  "version": "1.0.120",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -9,7 +9,6 @@
     "build": "bun build src/index.ts --outdir dist --target bun",
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "mcp": "bun run mcp/index.ts",
     "start:prod": "bun run dist/index.js",
     "test": "vitest run tests/unit/",
     "test:watch": "vitest tests/unit/",
@@ -45,7 +44,6 @@
     "@google-cloud/storage": "^7.18.0",
     "@google/generative-ai": "^0.21.0",
     "@hono/zod-validator": "^0.7.5",
-    "@modelcontextprotocol/sdk": "^1.30.0",
     "@sudobility/auth_service": "^1.1.20",
     "@sudobility/entity_service": "^1.0.40",
     "@sudobility/ratelimit_service": "^1.0.38",
@@ -65,8 +63,5 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/johnqh/shapeshyft_api.git"
-  },
-  "bin": {
-    "shapeshyft-api-mcp": "./mcp/index.ts"
   }
 }

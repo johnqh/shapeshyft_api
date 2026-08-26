@@ -5,12 +5,24 @@
  * This eliminates duplication of entity config and permission checking.
  */
 
-import { db, entities, entityMembers, entityInvitations, users } from "../db";
+import {
+  db,
+  entities,
+  entityMembers,
+  entityInvitations,
+  entityApiKeys,
+  users,
+} from "../db";
 import {
   createEntityHelpers,
+  MANAGER_PERMISSIONS,
   type InvitationHelperConfig,
+  type ApiKeyHelperConfig,
   type Entity,
+  type EntityPermissions,
 } from "@sudobility/entity_service";
+import { ENTITY_API_KEY_PREFIX } from "./entity-api-key";
+import type { Context } from "hono";
 
 // =============================================================================
 // Singleton Entity Helpers Configuration
@@ -21,12 +33,14 @@ import {
  * Uses the lazy Proxy-based db connection so it is safe to reference at
  * module load time -- actual database access is deferred.
  */
-const sharedConfig: InvitationHelperConfig = {
+const sharedConfig: InvitationHelperConfig & ApiKeyHelperConfig = {
   db: db as any,
   entitiesTable: entities,
   membersTable: entityMembers,
   invitationsTable: entityInvitations,
+  apiKeysTable: entityApiKeys,
   usersTable: users,
+  keyPrefix: ENTITY_API_KEY_PREFIX,
 };
 
 /**
@@ -57,36 +71,93 @@ interface PermissionFailure {
 export type EntityPermissionResult = PermissionSuccess | PermissionFailure;
 
 // =============================================================================
+// Actors
+// =============================================================================
+
+/**
+ * Who is making a request.
+ *
+ * A Firebase token or a personal API key identifies a *user*, whose access is
+ * decided by their membership role. An entity API key identifies the *entity*
+ * itself -- it carries no membership, so it is authorised by matching the
+ * entity it was issued for.
+ */
+export type EntityActor =
+  | { kind: "user"; userId: string }
+  | { kind: "entity_api_key"; entityId: string; keyId: string };
+
+/** Build a user actor. Accepts a bare Firebase UID for brevity at call sites. */
+export function userActor(userId: string): EntityActor {
+  return { kind: "user", userId };
+}
+
+/**
+ * Permissions granted to an entity API key over its own entity.
+ *
+ * Manager-level: it may manage projects, endpoints, provider keys, and storage,
+ * but never members or roles. Minting further API keys is blocked separately in
+ * the entity API key routes, so a leaked key cannot mint more of itself.
+ */
+export const ENTITY_API_KEY_PERMISSIONS: EntityPermissions =
+  MANAGER_PERMISSIONS;
+
+// =============================================================================
 // Shared Permission Helper
 // =============================================================================
 
 /**
  * Look up an entity by slug and verify the user has appropriate permissions.
  *
- * When `requireEdit` is true, checks if the user can create projects
- * (i.e., has an admin/editor role). Otherwise, checks view access.
+ * When `requireEdit` is false, checks view access. When it is `true`, checks
+ * if the user can create projects (i.e., has an admin/editor role). Pass a
+ * permission name instead to require that specific permission -- for example
+ * `"canManageApiKeys"` for routes that write credentials.
  *
  * @param entitySlug - The entity's URL-safe slug
- * @param userId - The Firebase UID of the requesting user
- * @param requireEdit - If true, require edit-level permissions (default: false)
+ * @param actor - The requesting actor: a Firebase UID, or an `EntityActor`
+ *   (use `getActor(c)` so entity API key requests are handled)
+ * @param requireEdit - `true` for `canCreateProjects`, or a permission name (default: false)
  * @returns A discriminated union with either `{ entity }` or `{ error, errorCode }`
  */
 export async function getEntityWithPermission(
   entitySlug: string,
-  userId: string,
-  requireEdit = false
+  actor: string | EntityActor,
+  requireEdit: boolean | keyof EntityPermissions = false
 ): Promise<EntityPermissionResult> {
+  const resolved: EntityActor =
+    typeof actor === "string" ? userActor(actor) : actor;
+
   const entity = await entityHelpers.entity.getEntityBySlug(entitySlug);
   if (!entity) {
     return { error: "Entity not found", errorCode: "ENTITY_NOT_FOUND" };
   }
 
-  if (requireEdit) {
-    const canEdit = await entityHelpers.permissions.canCreateProjects(
+  const required = requireEdit === true ? "canCreateProjects" : requireEdit;
+
+  // An entity API key authenticates as the entity, so there is no membership to
+  // consult: it is authorised exactly for the entity it was issued for.
+  if (resolved.kind === "entity_api_key") {
+    if (resolved.entityId !== entity.id) {
+      return {
+        error: "API key does not grant access to this entity",
+        errorCode: "ACCESS_DENIED",
+      };
+    }
+    if (required && !ENTITY_API_KEY_PERMISSIONS[required]) {
+      return {
+        error: "Insufficient permissions",
+        errorCode: "INSUFFICIENT_PERMISSIONS",
+      };
+    }
+    return { entity };
+  }
+
+  if (required) {
+    const permissions = await entityHelpers.permissions.getUserPermissions(
       entity.id,
-      userId
+      resolved.userId
     );
-    if (!canEdit) {
+    if (!permissions?.[required]) {
       return {
         error: "Insufficient permissions",
         errorCode: "INSUFFICIENT_PERMISSIONS",
@@ -95,7 +166,7 @@ export async function getEntityWithPermission(
   } else {
     const canView = await entityHelpers.permissions.canViewEntity(
       entity.id,
-      userId
+      resolved.userId
     );
     if (!canView) {
       return { error: "Access denied", errorCode: "ACCESS_DENIED" };
@@ -103,6 +174,26 @@ export async function getEntityWithPermission(
   }
 
   return { entity };
+}
+
+/**
+ * Read the acting identity off a Hono context.
+ *
+ * Routes should pass this to `getEntityWithPermission` rather than a bare
+ * `userId`, so requests authenticated with an entity API key are authorised as
+ * the entity instead of being checked against a membership that does not exist.
+ *
+ * @param c - The Hono context, after `firebaseAuthMiddleware` has run
+ */
+export function getActor(c: Context): EntityActor {
+  if (c.get("authMethod") === "entity_api_key") {
+    return {
+      kind: "entity_api_key",
+      entityId: c.get("entityApiKeyEntityId"),
+      keyId: c.get("entityApiKeyId"),
+    };
+  }
+  return userActor(c.get("userId"));
 }
 
 /**

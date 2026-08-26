@@ -20,6 +20,7 @@ import {
 } from "@sudobility/shapeshyft_types";
 import { encryptApiKey } from "../lib/encryption";
 import {
+  getActor,
   getEntityWithPermission,
   getPermissionErrorStatus,
 } from "../lib/entity-helpers";
@@ -46,10 +47,9 @@ function toSafeConfig(
 // GET storage config for entity
 storageRouter.get("/", zValidator("param", entitySlugParamSchema), async c => {
   try {
-    const userId = c.get("userId");
     const { entitySlug } = c.req.valid("param");
 
-    const result = await getEntityWithPermission(entitySlug, userId);
+    const result = await getEntityWithPermission(entitySlug, getActor(c));
     if (result.error !== undefined) {
       return c.json(
         errorResponse(result.error),
@@ -84,7 +84,11 @@ storageRouter.post(
       const { entitySlug } = c.req.valid("param");
       const body = c.req.valid("json");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        "canManageApiKeys"
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -154,11 +158,14 @@ storageRouter.put(
   zValidator("json", storageConfigUpdateSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug } = c.req.valid("param");
       const body = c.req.valid("json");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        "canManageApiKeys"
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -223,10 +230,13 @@ storageRouter.delete(
   zValidator("param", entitySlugParamSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        "canManageApiKeys"
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),

@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.118",
+  "version": "1.0.119",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -9,6 +9,7 @@
     "build": "bun build src/index.ts --outdir dist --target bun",
     "dev": "bun run --watch src/index.ts",
     "start": "bun run src/index.ts",
+    "mcp": "bun run mcp/index.ts",
     "start:prod": "bun run dist/index.js",
     "test": "vitest run tests/unit/",
     "test:watch": "vitest tests/unit/",
@@ -44,12 +45,13 @@
     "@google-cloud/storage": "^7.18.0",
     "@google/generative-ai": "^0.21.0",
     "@hono/zod-validator": "^0.7.5",
-    "@sudobility/auth_service": "^1.1.19",
-    "@sudobility/entity_service": "^1.0.38",
-    "@sudobility/ratelimit_service": "^1.0.37",
-    "@sudobility/shapeshyft_types": "^1.0.56",
-    "@sudobility/subscription_service": "^1.0.21",
-    "@sudobility/types": "^1.9.65",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@sudobility/auth_service": "^1.1.20",
+    "@sudobility/entity_service": "^1.0.40",
+    "@sudobility/ratelimit_service": "^1.0.38",
+    "@sudobility/shapeshyft_types": "^1.0.57",
+    "@sudobility/subscription_service": "^1.0.22",
+    "@sudobility/types": "^1.9.66",
     "drizzle-orm": "^0.45.0",
     "firebase-admin": "^13.6.0",
     "groq-sdk": "^0.37.0",
@@ -63,5 +65,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/johnqh/shapeshyft_api.git"
+  },
+  "bin": {
+    "shapeshyft-api-mcp": "./mcp/index.ts"
   }
 }

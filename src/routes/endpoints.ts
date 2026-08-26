@@ -20,6 +20,7 @@ import {
   type Endpoint,
 } from "@sudobility/shapeshyft_types";
 import {
+  getActor,
   getEntityWithPermission,
   getPermissionErrorStatus,
 } from "../lib/entity-helpers";
@@ -53,10 +54,9 @@ async function verifyKeyOwnership(entityId: string, keyId: string) {
 // GET all endpoints for project
 endpointsRouter.get("/", zValidator("param", projectIdParamSchema), async c => {
   try {
-    const userId = c.get("userId");
     const { entitySlug, projectId } = c.req.valid("param");
 
-    const result = await getEntityWithPermission(entitySlug, userId);
+    const result = await getEntityWithPermission(entitySlug, getActor(c));
     if (result.error !== undefined) {
       return c.json(
         errorResponse(result.error),
@@ -87,10 +87,9 @@ endpointsRouter.get(
   zValidator("param", endpointIdParamSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId, endpointId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
+      const result = await getEntityWithPermission(entitySlug, getActor(c));
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -135,11 +134,14 @@ endpointsRouter.post(
   zValidator("json", endpointCreateSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId } = c.req.valid("param");
       const body = c.req.valid("json");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        true
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -221,11 +223,14 @@ endpointsRouter.put(
   zValidator("json", endpointUpdateSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId, endpointId } = c.req.valid("param");
       const body = c.req.valid("json");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        true
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -351,10 +356,13 @@ endpointsRouter.delete(
   zValidator("param", endpointIdParamSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId, endpointId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        true
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),

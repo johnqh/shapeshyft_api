@@ -27,6 +27,7 @@ import {
   decryptProjectApiKey,
 } from "../lib/api-key";
 import {
+  getActor,
   getEntityWithPermission,
   getPermissionErrorStatus,
 } from "../lib/entity-helpers";
@@ -36,10 +37,9 @@ const projectsRouter = new Hono();
 // GET all projects for entity
 projectsRouter.get("/", zValidator("param", entitySlugParamSchema), async c => {
   try {
-    const userId = c.get("userId");
     const { entitySlug } = c.req.valid("param");
 
-    const result = await getEntityWithPermission(entitySlug, userId);
+    const result = await getEntityWithPermission(entitySlug, getActor(c));
     if (result.error !== undefined) {
       return c.json(
         errorResponse(result.error),
@@ -65,10 +65,9 @@ projectsRouter.get(
   zValidator("param", projectIdParamSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
+      const result = await getEntityWithPermission(entitySlug, getActor(c));
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -108,11 +107,14 @@ projectsRouter.post(
   zValidator("json", projectCreateSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug } = c.req.valid("param");
       const body = c.req.valid("json");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        true
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -171,11 +173,14 @@ projectsRouter.put(
   zValidator("json", projectUpdateSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId } = c.req.valid("param");
       const body = c.req.valid("json");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        true
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -246,10 +251,13 @@ projectsRouter.delete(
   zValidator("param", projectIdParamSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        true
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -288,10 +296,9 @@ projectsRouter.get(
   zValidator("param", projectIdParamSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId);
+      const result = await getEntityWithPermission(entitySlug, getActor(c));
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),
@@ -344,10 +351,13 @@ projectsRouter.post(
   zValidator("param", projectIdParamSchema),
   async c => {
     try {
-      const userId = c.get("userId");
       const { entitySlug, projectId } = c.req.valid("param");
 
-      const result = await getEntityWithPermission(entitySlug, userId, true);
+      const result = await getEntityWithPermission(
+        entitySlug,
+        getActor(c),
+        true
+      );
       if (result.error !== undefined) {
         return c.json(
           errorResponse(result.error),

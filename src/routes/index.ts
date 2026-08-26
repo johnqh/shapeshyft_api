@@ -20,6 +20,7 @@ import providersRouter from "./providers";
 import storageRouter from "./storage";
 import usersRouter from "./users";
 import userApiKeysRouter from "./user-api-keys";
+import entityApiKeysRouter from "./entity-api-keys";
 
 const routes = new Hono();
 
@@ -32,6 +33,7 @@ routes.route("/providers", providersRouter);
 const adminRoutes = new Hono();
 adminRoutes.use("*", firebaseAuthMiddleware);
 adminRoutes.route("/entities/:entitySlug/keys", keysRouter);
+adminRoutes.route("/entities/:entitySlug/api-keys", entityApiKeysRouter);
 adminRoutes.route("/entities/:entitySlug/storage", storageRouter);
 adminRoutes.route("/entities/:entitySlug/projects", projectsRouter);
 adminRoutes.route(
@@ -64,4 +66,5 @@ export {
   storageRouter,
   usersRouter,
   userApiKeysRouter,
+  entityApiKeysRouter,
 };

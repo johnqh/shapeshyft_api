@@ -38,6 +38,25 @@ export const entitySlugParamSchema = z.object({
   entitySlug: z.string().min(1).max(12),
 });
 
+// Entity API keys ("shyftent_...")
+export const entityApiKeyIdParamSchema = z.object({
+  entitySlug: z.string().min(1).max(12),
+  keyId: z.string().uuid(),
+});
+
+export const entityApiKeyCreateSchema = z.object({
+  key_name: z.string().min(1).max(255),
+});
+
+export const entityApiKeyUpdateSchema = z
+  .object({
+    key_name: z.string().min(1).max(255).optional(),
+    is_active: z.boolean().optional(),
+  })
+  .refine(data => data.key_name !== undefined || data.is_active !== undefined, {
+    message: "Provide key_name or is_active",
+  });
+
 export const aiParamSchema = z.object({
   organizationPath: z
     .string()

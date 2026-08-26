@@ -13,6 +13,8 @@ import { eq } from "drizzle-orm";
 import { db, users } from "../db";
 import { extractUserApiKeyFromHeaders } from "../lib/user-api-key";
 import { resolveUserApiKey } from "../lib/user-api-key-cache";
+import { extractEntityApiKeyFromHeaders } from "../lib/entity-api-key";
+import { entityHelpers } from "../lib/entity-helpers";
 
 /**
  * Augment Hono's ContextVariableMap for type-safe context access.
@@ -23,12 +25,30 @@ declare module "hono" {
     userId: string;
     userEmail: string | null;
     siteAdmin: boolean;
-    /** How the caller authenticated. "api_key" requests have no firebaseUser. */
-    authMethod: "firebase" | "api_key";
+    /**
+     * How the caller authenticated. Neither key method has a firebaseUser.
+     * "api_key" is a personal key (acts as a user); "entity_api_key" is an
+     * entity key (acts as the entity itself).
+     */
+    authMethod: "firebase" | "api_key" | "entity_api_key";
     /** UUID of the user API key used, when authMethod is "api_key" */
     apiKeyId: string;
+    /** UUID of the entity API key used, when authMethod is "entity_api_key" */
+    entityApiKeyId: string;
+    /** Entity the request acts as, when authMethod is "entity_api_key" */
+    entityApiKeyEntityId: string;
   }
 }
+
+/**
+ * Path prefix an entity API key may reach.
+ *
+ * Entity keys are scoped to entity-owned resources: projects, endpoints,
+ * provider keys, storage, analytics. They must not reach `/users/...`, which
+ * would let a key read or mint credentials belonging to the person who created
+ * it -- an escalation from "acts as the entity" to "acts as its author".
+ */
+const ENTITY_API_KEY_PATH_PREFIX = "/entities/";
 
 /**
  * Ensure user record exists in database.
@@ -83,13 +103,55 @@ export async function firebaseAuthMiddleware(c: Context, next: Next) {
     return;
   }
 
-  // 2. Firebase ID token
+  // 2. Entity API key ("shyftent_..."). Authenticates as the entity itself: no
+  // user identity, so downstream permission checks match on the entity instead
+  // of a membership role. `userId` is still populated with the key's author so
+  // audit columns keep a value.
+  const entityApiKey = extractEntityApiKeyFromHeaders(name =>
+    c.req.header(name)
+  );
+  if (entityApiKey) {
+    if (!entityHelpers.apiKeys) {
+      return c.json(errorResponse("Entity API keys are not enabled"), 501);
+    }
+
+    const identity = await entityHelpers.apiKeys.verifyKey(entityApiKey);
+    if (!identity) {
+      return c.json(errorResponse("Invalid or inactive API key"), 401);
+    }
+
+    if (!c.req.path.includes(ENTITY_API_KEY_PATH_PREFIX)) {
+      return c.json(
+        errorResponse(
+          "Entity API keys may only access entity-scoped routes. Use a Firebase token or personal API key for this request."
+        ),
+        403
+      );
+    }
+
+    c.set("userId", identity.createdByUserId);
+    c.set("userEmail", null);
+    c.set("siteAdmin", false);
+    c.set("authMethod", "entity_api_key");
+    c.set("entityApiKeyId", identity.keyId);
+    c.set("entityApiKeyEntityId", identity.entityId);
+
+    // Best-effort usage bookkeeping; never blocks the request
+    entityHelpers.apiKeys
+      .touchLastUsed(identity.keyId)
+      .catch(err => console.error("Failed to stamp API key usage:", err));
+
+    await next();
+    return;
+  }
+
+  // 3. Firebase ID token
   const authHeader = c.req.header("Authorization");
 
   if (!authHeader) {
     return c.json(
       errorResponse(
-        "Authorization required. Provide a Firebase ID token as 'Authorization: Bearer <token>' or a personal API key as 'X-API-Key: shyft_...'"
+        "Authorization required. Provide a Firebase ID token as 'Authorization: Bearer <token>', a personal API key as 'X-API-Key: shyft_...', or an entity API key as 'X-API-Key: shyftent_...'"
       ),
       401
     );

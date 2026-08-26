@@ -1,5 +1,10 @@
 # ShapeShyft API
 
+> **Git policy — never auto-commit or auto-push.** Leave your work in the working tree.
+> Run `git commit`, `git push`, `gh pr create`, or `scripts/push_all.sh` **only when the user
+> explicitly asks in that turn**. Approval for an earlier change does not carry forward, and
+> finishing a task is not permission to commit it.
+
 Backend API server for ShapeShyft - an LLM structured output platform (v1.0.95).
 
 ## Tech Stack
@@ -530,3 +535,7 @@ bun run test:setup && bun run test:integration
 - **Route registration order matters** -- public routes must be registered before admin routes in `src/routes/index.ts` to avoid wildcard auth middleware interception.
 - **50MB body limit** -- set in `src/index.ts` via Hono bodyLimit middleware for base64-encoded media uploads.
 - **Entity slug max 12 chars** -- enforced by Zod schema. Important for URL parsing.
+
+## Git Workflow
+
+- Do not use feature branches for code changes. Always stay on the current branch.

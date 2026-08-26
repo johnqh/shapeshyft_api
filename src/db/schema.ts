@@ -23,6 +23,7 @@ import {
   createEntitiesTable,
   createEntityMembersTable,
   createEntityInvitationsTable,
+  createEntityApiKeysTable,
 } from "@sudobility/entity_service";
 
 // Create the shapeshyft schema
@@ -89,6 +90,15 @@ export const entityMembers = createEntityMembersTable(
   "shapeshyft"
 );
 export const entityInvitations = createEntityInvitationsTable(
+  shapeshyftSchema,
+  "shapeshyft"
+);
+/**
+ * Entity-scoped API keys ("shyftent_..."). Authenticate a caller as the entity
+ * itself -- CI jobs, scripts, and MCP clients that outlive any one member.
+ * Hash-only storage, so a key is revealed once at creation.
+ */
+export const entityApiKeys = createEntityApiKeysTable(
   shapeshyftSchema,
   "shapeshyft"
 );

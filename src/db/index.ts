@@ -166,6 +166,41 @@ export async function initDatabase() {
   `;
 
   // =============================================================================
+  // Step 2c: Create entity_api_keys table (references entities.id)
+  // Entity-scoped keys used by CI, scripts, and MCP clients.
+  // =============================================================================
+
+  await client`
+    CREATE TABLE IF NOT EXISTS shapeshyft.entity_api_keys (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      entity_id UUID NOT NULL REFERENCES shapeshyft.entities(id) ON DELETE CASCADE,
+      key_name VARCHAR(255) NOT NULL,
+      key_hash VARCHAR(64) NOT NULL UNIQUE,
+      key_prefix VARCHAR(20) NOT NULL,
+      created_by_user_id VARCHAR(128) NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      last_used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await client`
+    CREATE UNIQUE INDEX IF NOT EXISTS shapeshyft_entity_api_keys_hash_idx
+      ON shapeshyft.entity_api_keys(key_hash)
+  `;
+
+  await client`
+    CREATE INDEX IF NOT EXISTS shapeshyft_entity_api_keys_entity_idx
+      ON shapeshyft.entity_api_keys(entity_id)
+  `;
+
+  await client`
+    CREATE INDEX IF NOT EXISTS shapeshyft_entity_api_keys_active_idx
+      ON shapeshyft.entity_api_keys(is_active)
+  `;
+
+  // =============================================================================
   // Step 3: Create llm_api_keys table (references entities.id)
   // =============================================================================
 

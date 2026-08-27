@@ -271,6 +271,7 @@ export async function initDatabase() {
       context TEXT,
       is_active BOOLEAN DEFAULT true,
       ip_allowlist JSONB,
+      call_count INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(project_id, endpoint_name)
@@ -288,6 +289,25 @@ export async function initDatabase() {
         AND column_name = 'model'
       ) THEN
         ALTER TABLE shapeshyft.endpoints ADD COLUMN model VARCHAR(255);
+      END IF;
+    END $$;
+  `;
+
+  // Add call_count column if it doesn't exist (migration for existing tables).
+  // Existing endpoints start at 0 rather than backfilling from usage_analytics:
+  // the counter is a forward-looking tally, and a backfill would silently
+  // disagree with any analytics rows that have since been pruned.
+  await client`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'shapeshyft'
+        AND table_name = 'endpoints'
+        AND column_name = 'call_count'
+      ) THEN
+        ALTER TABLE shapeshyft.endpoints
+          ADD COLUMN call_count INTEGER NOT NULL DEFAULT 0;
       END IF;
     END $$;
   `;

@@ -11,12 +11,12 @@
         "@google-cloud/storage": "^7.18.0",
         "@google/generative-ai": "^0.21.0",
         "@hono/zod-validator": "^0.7.5",
-        "@sudobility/auth_service": "^1.1.20",
-        "@sudobility/entity_service": "^1.0.40",
-        "@sudobility/ratelimit_service": "^1.0.38",
-        "@sudobility/shapeshyft_types": "^1.0.57",
-        "@sudobility/subscription_service": "^1.0.22",
-        "@sudobility/types": "^1.9.66",
+        "@sudobility/auth_service": "^1.1.21",
+        "@sudobility/entity_service": "^1.0.41",
+        "@sudobility/ratelimit_service": "^1.0.39",
+        "@sudobility/shapeshyft_types": "^1.0.58",
+        "@sudobility/subscription_service": "^1.0.23",
+        "@sudobility/types": "^1.9.67",
         "drizzle-orm": "^0.45.0",
         "firebase-admin": "^13.6.0",
         "groq-sdk": "^0.37.0",
@@ -492,17 +492,17 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.20", "", { "peerDependencies": { "@sudobility/types": "^1.9.66", "firebase-admin": "^13.0.0" } }, "sha512-o5fJjujdtFxzfG6QKPNyqaTNjPk403I4GPAMtj+phcvoWwLLPxIrYJwzqE86q6F6lRaYUqlFa+NsOsDRL7TrFw=="],
+    "@sudobility/auth_service": ["@sudobility/auth_service@1.1.21", "", { "peerDependencies": { "@sudobility/types": "^1.9.67", "firebase-admin": "^13.0.0" } }, "sha512-t+9BskQBaNOf1WVhkEQ1Lc4UMgZ5kVHhVfnwkchXeVUtbIokbBGXirlckscRnf+zNjdBExG/n4esv36NstDEDA=="],
 
-    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.40", "", { "peerDependencies": { "@sudobility/types": "^1.9.66", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-bhablGGB6eSAZ64L8wnZJ2R5ljcFzsYfZYO3b3LUx8B+LiSErLBSJeu+Csv8ujfkRitAfhlOpaeGURcochKtHg=="],
+    "@sudobility/entity_service": ["@sudobility/entity_service@1.0.41", "", { "peerDependencies": { "@sudobility/types": "^1.9.67", "drizzle-orm": "^0.45.0", "hono": "^4.0.0" } }, "sha512-0XbIvh56UdljtgBi2O1c1Ew4/V0/rMt87YSwit4sEx7T2pNXqnHBpyFhTPuJfye2hW/j7FQ+M/3pwqXmKvD37w=="],
 
-    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.38", "", { "peerDependencies": { "@sudobility/types": "^1.9.66", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-3/me6T/0kFxpxz8BobmI6WU/xKyRulEkmOlvC0ui80xhzLvC4UHkx1pBLPy0n6aL25XhyF79mtSBRdJkp9bUbA=="],
+    "@sudobility/ratelimit_service": ["@sudobility/ratelimit_service@1.0.39", "", { "peerDependencies": { "@sudobility/types": "^1.9.67", "drizzle-orm": "^0.45.0", "hono": "^4.0.0", "postgres": "^3.4.0" } }, "sha512-/GA+c4NezQp0/CfrJyf60KclOHK/MxNDhKAhZLWLSb3U5/1gQ1Mp9rI3lT53kNe/DPVKX7mshfudAk51Jimbmg=="],
 
-    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.57", "", { "peerDependencies": { "@sudobility/types": "^1.9.66" } }, "sha512-DcgRcJhPsOHgdfAa28vz3IJBVe+SY37046TiON+sQ/qrkgMgLQwb4dlGw7SusELm4OJ1JTfKlQEEdcapMiyI5A=="],
+    "@sudobility/shapeshyft_types": ["@sudobility/shapeshyft_types@1.0.58", "", { "peerDependencies": { "@sudobility/types": "^1.9.67" } }, "sha512-UUetxx9GUZlGGjkHWI3SC9ErEawjRw6AqxrXx+FZzOeaSpds8OHUnLZj6cmq1sQ9uyVwswMxaF0H45Vux9PvXg=="],
 
-    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.22", "", {}, "sha512-IVkANk5pDVX5U8Ibd0yw/k5JCEengR4Zk6gxPbJ1kLka6dHNjXkeNaRs2J5tlZl9XC+jApP3qwUdBmyPReibWA=="],
+    "@sudobility/subscription_service": ["@sudobility/subscription_service@1.0.23", "", {}, "sha512-IbpWkMvyAirLZzX+7M1T74fVebWmyX/NCjyY2BCqL2jRQZGCEqb8JCVIYHXvqQd8gwx1E0foz+E9yb0SEWbngw=="],
 
-    "@sudobility/types": ["@sudobility/types@1.9.66", "", {}, "sha512-eD61iT72sB5+1zJJtM81+eB0YmqEQ0dc/qno0Sw3GYJHcpkbgwN6LYEmiyJzlqtcN9sG5nWuexH9NnBvLODrtw=="],
+    "@sudobility/types": ["@sudobility/types@1.9.67", "", {}, "sha512-d+jk4L9i8VNvOnCJW/craqiiUTPH5aRq4KYe/QBrBU3mCcTfoYjgzzXopVQRcthiZ5dwQAEpdqCTQ0gAWRN6Ww=="],
 
     "@tootallnate/once": ["@tootallnate/once@2.0.0", "", {}, "sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A=="],
 

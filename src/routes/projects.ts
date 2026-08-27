@@ -53,7 +53,9 @@ projectsRouter.get("/", zValidator("param", entitySlugParamSchema), async c => {
       .from(projects)
       .where(eq(projects.entity_id, result.entity.id));
 
-    return c.json(successResponse<Project[]>(rows.map(publicProject) as Project[]));
+    return c.json(
+      successResponse<Project[]>(rows.map(publicProject) as Project[])
+    );
   } catch (error: any) {
     console.error("Error getting projects:", error);
     return c.json(errorResponse(error.message || "Internal server error"), 500);
@@ -90,7 +92,9 @@ projectsRouter.get(
         return c.json(errorResponse("Project not found"), 404);
       }
 
-      return c.json(successResponse<Project>(publicProject(rows[0]) as Project));
+      return c.json(
+        successResponse<Project>(publicProject(rows[0]) as Project)
+      );
     } catch (error: any) {
       console.error("Error getting project:", error);
       return c.json(

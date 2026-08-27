@@ -7,7 +7,7 @@
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import {
   db,
   projects,
@@ -53,6 +53,27 @@ import {
 } from "../lib/capability-validator";
 
 const aiRouter = new Hono();
+
+/**
+ * Record one invocation against the endpoint's lifetime counter.
+ *
+ * Incremented in SQL rather than read-modify-write so concurrent calls to the
+ * same endpoint cannot lose counts. Best-effort: a failure here is logged and
+ * swallowed, because losing a tally must never fail a request the caller
+ * already paid for.
+ *
+ * @param endpointId - UUID of the endpoint that was called
+ */
+async function incrementCallCount(endpointId: string): Promise<void> {
+  try {
+    await db
+      .update(endpoints)
+      .set({ call_count: sql`${endpoints.call_count} + 1` })
+      .where(eq(endpoints.uuid, endpointId));
+  } catch (error) {
+    console.error("Failed to increment endpoint call count:", error);
+  }
+}
 
 // =============================================================================
 // Types
@@ -742,7 +763,8 @@ async function handleAIRequest(c: any) {
       llmResponse.usage.completionTokens
     );
 
-    // 6. Log analytics
+    // 6. Log analytics and count the call
+    await incrementCallCount(endpoint.uuid);
     await db.insert(usageAnalytics).values({
       endpoint_id: endpoint.uuid,
       success: true,
@@ -785,7 +807,9 @@ async function handleAIRequest(c: any) {
         ? (error.details as Record<string, unknown>)
         : undefined;
 
-    // Log failed analytics
+    // Log failed analytics and count the call: the endpoint was invoked, so it
+    // counts whether or not the provider answered.
+    await incrementCallCount(endpoint.uuid);
     await db.insert(usageAnalytics).values({
       endpoint_id: endpoint.uuid,
       success: false,

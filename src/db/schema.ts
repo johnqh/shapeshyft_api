@@ -256,6 +256,11 @@ export const endpoints = shapeshyftSchema.table(
     transcription_extraction_model: varchar("transcription_extraction_model", {
       length: 255,
     }),
+    /**
+     * Lifetime invocation count, incremented on every call -- successful or
+     * failed -- alongside the usage_analytics row for that call.
+     */
+    call_count: integer("call_count").notNull().default(0),
     created_at: timestamp("created_at").defaultNow(),
     updated_at: timestamp("updated_at").defaultNow(),
   },

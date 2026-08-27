@@ -29,7 +29,10 @@ export default [
       // TypeScript rules
       "@typescript-eslint/no-unused-vars": [
         "error",
-        { argsIgnorePattern: "^_" },
+        // ignoreRestSiblings allows the omit-by-destructuring idiom, e.g.
+        // `const { secret: _s, ...rest } = row` -- the named siblings exist
+        // only to be dropped from `rest`.
+        { argsIgnorePattern: "^_", ignoreRestSiblings: true },
       ],
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/explicit-function-return-type": "off",

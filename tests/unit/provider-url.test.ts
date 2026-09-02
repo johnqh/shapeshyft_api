@@ -170,6 +170,15 @@ describe("resolveCallerIp", () => {
       expect(result).toBe("142.254.88.21");
     });
 
+    it("ignores a forged CF-Connecting-IP from a direct client", () => {
+      // No Cloudflare in the path, so the header is whatever the client typed.
+      const result = resolveCallerIp(
+        "142.254.88.21",
+        headers({ "cf-connecting-ip": "169.254.169.254" })
+      );
+      expect(result).toBe("142.254.88.21");
+    });
+
     it("ignores a forged X-Real-Ip too", () => {
       const result = resolveCallerIp(
         "142.254.88.21",
@@ -208,6 +217,54 @@ describe("resolveCallerIp", () => {
       const result = resolveCallerIp(
         "172.18.0.2",
         headers({ "x-forwarded-for": "1.2.3.4, 142.254.88.197, 172.18.0.5" })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("prefers CF-Connecting-IP, the only header Cloudflare guarantees is the client", () => {
+      // Reproduces the real api.shapeshyft.ai chain: Cloudflare in front of
+      // Traefik. Traefik has no trustedIPs, so it discards Cloudflare's
+      // X-Forwarded-For and replaces it with the edge address.
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({
+          "x-forwarded-for": "104.22.14.180",
+          "x-real-ip": "104.22.14.180",
+          "cf-connecting-ip": "142.254.88.197",
+        })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("falls back to True-Client-IP", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({
+          "x-forwarded-for": "104.22.14.180",
+          "true-client-ip": "142.254.88.197",
+        })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("ignores an unusable CF-Connecting-IP and falls through", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({
+          "cf-connecting-ip": "not-an-ip",
+          "x-forwarded-for": "142.254.88.197",
+        })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("ignores a private CF-Connecting-IP and falls through", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({
+          "cf-connecting-ip": "10.0.0.1",
+          "x-forwarded-for": "142.254.88.197",
+        })
       );
       expect(result).toBe("142.254.88.197");
     });

@@ -142,12 +142,24 @@ export function collectForwardingHeaders(
  *   (Traefik on the Docker network, in this deployment). Read the client from
  *   the forwarded headers it set.
  *
- * Within `X-Forwarded-For`, entries are read **right to left**, taking the
- * first public one. Each proxy appends the address that connected to it, so
- * everything on the right was written by trusted infrastructure while the
- * leftmost entries may have been supplied by the client. Traefik currently
- * strips client-sent forwarded headers (it has no `trustedIPs` configured), but
- * reading from the right stays correct if that ever changes.
+ * On the trusted branch the headers are consulted in a deliberate order:
+ *
+ * 1. `CF-Connecting-IP` / `True-Client-IP` -- a CDN's own client header, which
+ *    it overwrites on every request and a client therefore cannot forge.
+ * 2. `X-Forwarded-For`, read **right to left**, taking the first public entry.
+ *    Each proxy appends the address that connected to it, so the right-hand
+ *    entries were written by trusted infrastructure while the leftmost may have
+ *    come from the client.
+ * 3. `X-Real-Ip`.
+ *
+ * The CDN header must come first, and this is not theoretical. On
+ * api.shapeshyft.ai the chain is Cloudflare -> Traefik -> API, and Traefik has
+ * no `forwardedHeaders.trustedIPs`, so it *discards* Cloudflare's
+ * `X-Forwarded-For` and rewrites it with the Cloudflare edge address. That edge
+ * address is public, so every "is this routable" check passes and it looks like
+ * a perfectly good client IP -- it just is not one, and it changes from request
+ * to request. `CF-Connecting-IP` is the only header in that chain carrying the
+ * real client.
  *
  * @param peerAddress - The connection's peer, from `getConnInfo(c).remote.address`
  * @param getHeader - Case-insensitive header lookup
@@ -166,6 +178,17 @@ export function resolveCallerIp(
   }
 
   // Private peer: a hop inside our own network, so its headers are worth reading.
+
+  // A CDN's client header first: it is overwritten upstream on every request,
+  // whereas X-Forwarded-For may have been rewritten by an intermediate proxy
+  // that does not trust the CDN.
+  for (const name of ["cf-connecting-ip", "true-client-ip"]) {
+    const cdnClient = normalizeClientIp(getHeader(name));
+    if (cdnClient && isRoutableClientIp(cdnClient)) {
+      return cdnClient;
+    }
+  }
+
   const forwardedFor = getHeader("x-forwarded-for");
   if (forwardedFor) {
     const hops = forwardedFor.split(",");

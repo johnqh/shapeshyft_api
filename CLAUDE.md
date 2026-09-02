@@ -405,15 +405,29 @@ without the DNS, for a model server on a home connection.
     every forwarded header is ignored, forged or not.
   - **Private or loopback peer** -- the request came through our own reverse
     proxy (Traefik, on the Docker network in the `sudobility_dockerized`
-    deployment), so `X-Forwarded-For` / `X-Real-Ip` are read. An attacker cannot
-    make their connection originate from inside that network, which is what
-    makes the header trustworthy *only* on this branch.
-  - `X-Forwarded-For` is read **right to left**, taking the first public entry.
-    Each proxy appends the address that connected to it, so the right-hand
-    entries were written by trusted infrastructure while the leftmost may have
-    come from the client. Traefik currently strips client-sent forwarded headers
-    (no `trustedIPs` configured), but reading from the right survives that
-    changing.
+    deployment), so the forwarding headers are read. An attacker cannot make
+    their connection originate from inside that network, which is what makes
+    those headers trustworthy *only* on this branch.
+  - Headers are consulted in order: **`CF-Connecting-IP` / `True-Client-IP`**,
+    then `X-Forwarded-For` right-to-left taking the first public entry, then
+    `X-Real-Ip`.
+
+  **The CDN header must come first.** Production is Cloudflare -> Traefik -> API,
+  and because Traefik has no `forwardedHeaders.trustedIPs`, it *discards*
+  Cloudflare's `X-Forwarded-For` and rewrites it with the Cloudflare edge
+  address. Confirmed against the live API:
+
+  | source | value |
+  |---|---|
+  | peer | `172.18.0.2` (Traefik) |
+  | `x-forwarded-for` | `104.22.14.180` (Cloudflare edge) |
+  | `x-real-ip` | `104.22.14.180` (Cloudflare edge) |
+  | `cf-connecting-ip` | `142.254.88.197` (the actual client) |
+
+  The edge address is *public*, so it passes every routability check and looks
+  like a valid client IP. It also changes between requests, so trusting it makes
+  the sync thrash. This is not hypothetical: it was written into a live provider
+  URL once before `CF-Connecting-IP` was preferred.
 - **Only a public address is ever returned.** A loopback, private, or link-local
   result is reported as "could not determine" rather than written into a provider
   URL, where it would resolve nowhere useful. The route therefore does no

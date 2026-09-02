@@ -332,6 +332,30 @@ describe("POST /entities/self/providers/sync-ip", () => {
       expect(body.error).toContain("reverse proxy");
     });
 
+    it("uses CF-Connecting-IP on the real Cloudflare -> Traefik chain", async () => {
+      // Exactly what api.shapeshyft.ai sends: Traefik rewrote X-Forwarded-For
+      // with the Cloudflare edge, so only CF-Connecting-IP holds the client.
+      const res = await post(
+        {
+          "X-API-Key": apiKey,
+          "X-Forwarded-For": "104.22.14.180",
+          "X-Real-Ip": "104.22.14.180",
+          "CF-Connecting-IP": PROXIED_CLIENT,
+        },
+        PROXY_PEER
+      );
+      const body = (await res.json()) as SyncBody;
+
+      expect(res.status).toBe(200);
+      expect(body.data!.client_ip).toBe(PROXIED_CLIENT);
+
+      const [row] = await db
+        .select()
+        .from(llmApiKeys)
+        .where(eq(llmApiKeys.uuid, ids["ip-url"]!));
+      expect(row!.endpoint_url).toBe(`http://${PROXIED_CLIENT}:9000/v1`);
+    });
+
     it("restores the fixture for the remaining tests", async () => {
       const res = await post(
         { "X-API-Key": apiKey, "X-Forwarded-For": CALLER_IP },

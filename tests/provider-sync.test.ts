@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterAll,
+} from "bun:test";
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import routes from "../src/routes";
@@ -165,6 +172,17 @@ describe("POST /entities/self/providers/sync-ip", () => {
       "sync test key"
     );
     apiKey = (created as { key: string }).key;
+  });
+
+  /**
+   * Rebuild the providers before every test.
+   *
+   * These tests write to the rows they assert on, so sharing one fixture across
+   * them made each depend on the ones before it -- reorder or isolate any of
+   * them and they broke.
+   */
+  beforeEach(async () => {
+    await db.delete(llmApiKeys).where(eq(llmApiKeys.entity_id, entityId));
 
     const seed = async (name: string, provider: string, url: string | null) => {
       const [row] = await db
@@ -356,17 +374,10 @@ describe("POST /entities/self/providers/sync-ip", () => {
       expect(row!.endpoint_url).toBe(`http://${PROXIED_CLIENT}:9000/v1`);
     });
 
-    it("restores the fixture for the remaining tests", async () => {
-      const res = await post(
-        { "X-API-Key": apiKey, "X-Forwarded-For": CALLER_IP },
-        PROXY_PEER
-      );
-      expect(res.status).toBe(200);
-    });
   });
 
   it("is idempotent: a second sync reports everything unchanged", async () => {
-    await post({ "X-API-Key": apiKey }, CALLER_IP);
+    await post({ "X-API-Key": apiKey }, CALLER_IP); // first sync moves ip-url
     const res = await post({ "X-API-Key": apiKey }, CALLER_IP);
     const body = (await res.json()) as SyncBody;
 

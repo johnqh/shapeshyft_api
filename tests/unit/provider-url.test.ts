@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   collectForwardingHeaders,
+  isIpv6,
   normalizeClientIp,
   isRoutableClientIp,
   resolveCallerIp,
@@ -373,5 +374,48 @@ describe("collectForwardingHeaders", () => {
     );
     expect(result["cf-connecting-ip"]).toBe("142.254.88.197");
     expect(result["cf-ray"]).toBe("abc-CDG");
+  });
+});
+
+describe("isIpv6", () => {
+  it.each([
+    ["full form", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"],
+    ["compressed", "2001:db8::1"],
+    ["loopback", "::1"],
+    ["unspecified", "::"],
+    ["leading compression", "::ffff:1.2.3.4"],
+    ["trailing compression", "2001:db8::"],
+    ["eight groups", "1:2:3:4:5:6:7:8"],
+    ["embedded IPv4", "1:2:3:4:5:6:1.2.3.4"],
+    ["unique local", "fc00::1"],
+  ])("accepts %s", (_label, value) => {
+    expect(isIpv6(value)).toBe(true);
+  });
+
+  it.each([
+    ["a bare colon", ":"],
+    ["a trailing colon", "a:"],
+    ["a leading colon", ":a"],
+    ["too few groups", "1:2"],
+    ["too many groups", "1:2:3:4:5:6:7:8:9"],
+    ["a group over four digits", "12345::1"],
+    ["a non-hex group", "gggg::1"],
+    ["two compressions", "1::2::3"],
+    ["triple colon", ":::"],
+    ["quadruple colon", "::::"],
+    ["a zone index, unusable in a URL", "fe80::1%eth0"],
+    ["an empty string", ""],
+    ["no colon at all", "1.2.3.4"],
+    ["an embedded IPv4 that is invalid", "::ffff:999.1.1.1"],
+    ["an embedded IPv4 not in last position", "1:1.2.3.4:2"],
+    ["compressed but overlong", "1:2:3:4:5:6:7::8"],
+  ])("rejects %s", (_label, value) => {
+    expect(isIpv6(value)).toBe(false);
+  });
+
+  it("never reports a malformed value as a routable client address", () => {
+    for (const junk of [":", "a:", "1:2", ":::", "gggg::1"]) {
+      expect(normalizeClientIp(junk)).toBeNull();
+    }
   });
 });

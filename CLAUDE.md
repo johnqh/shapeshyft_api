@@ -369,100 +369,79 @@ key as real input, so weigh it before doing so.
 `endpoints.max_output_tokens` caps how many tokens one invocation may generate.
 Without it a looping model streams until the *provider* severs the connection --
 measured at ~13 minutes and 343KB for a request whose honest answer was ~2,000
-tokens -- and the caller pays for all of it. A stall timeout cannot catch this
-(a looping model streams continuously), and rate limiting is per entity and
-counts requests, so one runaway is invisible to it.
+tokens. A stall timeout cannot catch this (a looping model streams
+continuously), and rate limiting counts requests per entity, so one runaway is
+invisible to it.
 
-- **`null` means no protection.** Every endpoint that predates the column is
-  null, and stays that way: the migration adds no default and backfills nothing.
-- **New endpoints get `DEFAULT_MAX_OUTPUT_TOKENS` (8000)**, applied by
-  `endpointCreateSchema` rather than by the database, so every creation path
-  (dashboard, API, MCP) is protected while existing rows are untouched. Passing
-  an explicit `null` on create opts out.
-- **Update never re-caps**: an omitted field leaves the current value alone.
+- **`null` means no protection**, and every endpoint predating the column stays
+  null: the migration adds no default and backfills nothing.
+- **New endpoints get `DEFAULT_MAX_OUTPUT_TOKENS` (8000)** from
+  `endpointCreateSchema`, not from the database, so every creation path is
+  protected while existing rows are untouched. An explicit `null` on create opts
+  out; an omitted field on update leaves the current value alone.
 - The resolved ceiling reaches every provider as `LLMRequest.maxTokens`.
-  Anthropic keeps its own `?? 4096` fallback, so unprotected Anthropic endpoints
+  Anthropic keeps its `?? 4096` fallback, so unprotected Anthropic endpoints
   behave exactly as before.
 
-`resolveMaxOutputTokens` (`src/lib/output-limit.ts`) owns the clamping rule and
-rejects a malformed value with 400 rather than silently leaving the caller
-unprotected. It accepts a numeric *string*, because a GET invocation's input is
-parsed from the query string.
+`resolveMaxOutputTokens` (`src/lib/output-limit.ts`) owns the clamping --
+`min(per-call, endpoint)`, so a caller can only ask for less -- and rejects a
+malformed value with 400 rather than silently leaving them unprotected. It
+accepts a numeric *string*, since a GET invocation's input comes from the query
+string.
 
 ### Provider IP Sync
 
 `POST /entities/self/providers/sync-ip` rewrites the host of every `lm_studio`
 provider the entity owns to the address the request arrived from -- dynamic DNS
-without the DNS, for a model server on a home connection.
+without the DNS, for a model server on a home connection. `GET
+/entities/self/providers/client-ip` reports what the API sees, changing nothing.
 
-- **Entity API key only.** The entity comes from the key, so the caller sends no
-  body and needs to know neither its slug nor its own address. A Firebase token
-  is rejected: a browser's peer address says nothing about where the provider runs.
-- **The address is resolved by `resolveCallerIp`**, which decides how much to
-  trust the request based on the TCP peer from `getConnInfo()` (`hono/bun`).
-  Under Bun an IPv4 peer arrives IPv6-mapped (`::ffff:1.2.3.4`) and is unwrapped.
-  - **Public peer** -- the client reached the API directly. The peer is used and
-    every forwarded header is ignored, forged or not.
-  - **Private or loopback peer** -- the request came through our own reverse
-    proxy (Traefik, on the Docker network in the `sudobility_dockerized`
-    deployment), so the forwarding headers are read. An attacker cannot make
-    their connection originate from inside that network, which is what makes
-    those headers trustworthy *only* on this branch.
-  - Headers are consulted in order: **`CF-Connecting-IP` / `True-Client-IP`**,
-    then `X-Forwarded-For` right-to-left taking the first public entry, then
-    `X-Real-Ip`.
-
-  **The CDN header must come first.** Production is Cloudflare -> Traefik -> API,
-  and because Traefik has no `forwardedHeaders.trustedIPs`, it *discards*
-  Cloudflare's `X-Forwarded-For` and rewrites it with the Cloudflare edge
-  address. Confirmed against the live API:
-
-  | source | value |
-  |---|---|
-  | peer | `172.18.0.2` (Traefik) |
-  | `x-forwarded-for` | `104.22.14.180` (Cloudflare edge) |
-  | `x-real-ip` | `104.22.14.180` (Cloudflare edge) |
-  | `cf-connecting-ip` | `142.254.88.197` (the actual client) |
-
-  The edge address is *public*, so it passes every routability check and looks
-  like a valid client IP. It also changes between requests, so trusting it makes
-  the sync thrash. This is not hypothetical: it was written into a live provider
-  URL once before `CF-Connecting-IP` was preferred.
-- **Only a public address is ever returned.** A loopback, private, or link-local
-  result is reported as "could not determine" rather than written into a provider
-  URL, where it would resolve nowhere useful. The route therefore does no
-  routability check of its own -- `resolveCallerIp` guarantees it.
+- **Entity API key only.** The entity comes from the key; the caller sends no
+  body and needs to know neither its slug nor its own address.
 - **Only the host is replaced.** Scheme, credentials, port, path, query, and
-  fragment survive byte for byte, because `rewriteUrlHost` splices the string
-  rather than round-tripping through `URL.toString()`, which would drop a default
-  port and append a slash to an empty path.
-- **A hostname host is skipped**, with the reason reported: DNS already follows a
-  moving IP, and overwriting it with a bare address would throw that away.
-- Providers land in `updated` / `unchanged` / `skipped` buckets, so a cron job on
-  the home machine can log what moved. The operation is idempotent.
+  fragment survive byte for byte -- `rewriteUrlHost` splices the string rather
+  than round-tripping `URL.toString()`, which would drop a default port and
+  append a slash to an empty path. A hostname host is skipped: DNS already
+  follows a moving IP.
+- `planProviderSync` decides everything before anything is written; the route
+  applies the plan in **one transaction**, so a mid-loop failure cannot leave
+  some providers moved and some not.
+- Providers land in `updated` / `unchanged` / `skipped`. The operation is
+  idempotent.
 
-The routes are mounted at `/entities/self/providers` and registered **before**
-`/entities`, so the literal `self` is not taken for an entity slug. The
-`/entities/` prefix is also what lets an entity key reach them at all.
+Routes are mounted at `/entities/self/providers`, registered **before**
+`/entities` so `self` is not taken for a slug. The `/entities/` prefix is what
+lets an entity key reach them.
 
-#### Diagnosing the proxy chain first
+#### Resolving the caller's address
 
-`GET /entities/self/providers/client-ip` reports the peer, whether it is public,
-what `resolveCallerIp` would return, and the allowlisted forwarding headers that
-actually arrived. It changes nothing.
+`resolveCallerIp` decides how far to trust the request from the TCP peer
+(`getConnInfo()`, `hono/bun`; an IPv4 peer arrives IPv6-mapped and is unwrapped):
 
-**Use it before trusting any header in a new deployment.** Which header carries
-the real client address is a property of the deployment, not of the code, and
-reading it from an infrastructure repo is how a Cloudflare edge IP once got
-written into a live provider URL: `sudobility_dockerized` shows Traefik, but
-production also has Cloudflare in front of it. Traefik has no
-`forwardedHeaders.trustedIPs`, so it discards Cloudflare's `X-Forwarded-For` and
-replaces it with the Cloudflare edge address -- a *public* address, which passed
-every "is this routable" check.
+- **Public peer** -- the client reached us directly. Use it, ignore all headers.
+- **Private/loopback peer** -- the request came through our own proxy, so read
+  headers in this order: **`CF-Connecting-IP` / `True-Client-IP`**, then
+  `X-Forwarded-For` right-to-left taking the first public entry, then `X-Real-Ip`.
 
-Only headers on `FORWARDING_HEADERS` are echoed. Never widen that to the whole
-header set: the request carries the caller's `X-API-Key`, and a diagnostic that
-reflected it would leak a credential into responses and logs.
+Only a public address is ever returned, so the route needs no routability check
+of its own.
+
+**Measure the chain before trusting a header in a new deployment** -- use
+`client-ip`. Production is Cloudflare -> Traefik -> API, and because Traefik has
+no `forwardedHeaders.trustedIPs` it discards Cloudflare's `X-Forwarded-For` and
+substitutes the edge address:
+
+| source | value |
+|---|---|
+| peer | `172.18.0.2` (Traefik) |
+| `x-forwarded-for` / `x-real-ip` | `104.22.14.180` (Cloudflare edge, rotates) |
+| `cf-connecting-ip` | `142.254.88.197` (the actual client) |
+
+The edge address is *public*, so it passes every routability check and looks
+like a valid client. It was written into a live provider URL once before
+`CF-Connecting-IP` was preferred. Only headers on `FORWARDING_HEADERS` are ever
+echoed back -- never widen that to all headers, since the request carries the
+caller's `X-API-Key`.
 
 ### Finish Reason
 

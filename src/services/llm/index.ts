@@ -30,7 +30,9 @@ export function createLLMProvider(
 ): ILLMProvider {
   switch (providerType) {
     case "openai":
-      return new OpenAIProvider(config);
+      // The only caller that is OpenAI itself: its newer models name the output
+      // cap `max_completion_tokens`, which the compatible providers do not know.
+      return new OpenAIProvider(config, { isOpenAi: true });
     case "anthropic":
       return new AnthropicProvider(config);
     case "gemini":
@@ -41,13 +43,30 @@ export function createLLMProvider(
     // base URL so requests don't fall through to api.openai.com.
     case "mistral":
     case "xai":
-    case "deepseek":
     case "perplexity":
       return new OpenAIProvider({
         ...config,
         endpointUrl:
           config.endpointUrl ?? OPENAI_COMPATIBLE_BASE_URLS[providerType],
       });
+    /*
+      DeepSeek V4 reasons by default, and thinking mode rejects `tool_choice`.
+
+      Turning thinking off restores function calling — and is the right trade
+      anyway: measured on the same two-bar plan, 844 output tokens and 8.6s
+      with thinking against 126 tokens and 2.4s without, for an answer of the
+      same size. The reasoning is discarded, so it was working the caller paid
+      for and never saw.
+    */
+    case "deepseek":
+      return new OpenAIProvider(
+        {
+          ...config,
+          endpointUrl:
+            config.endpointUrl ?? OPENAI_COMPATIBLE_BASE_URLS[providerType],
+        },
+        { disableThinking: true }
+      );
     // NOTE: Cohere's API is NOT OpenAI-compatible (different request/response
     // shape); routing it through OpenAIProvider will not work regardless of base
     // URL. It needs a dedicated provider — left as-is to avoid changing behavior.

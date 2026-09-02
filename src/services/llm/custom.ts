@@ -5,6 +5,7 @@ import type {
   ProviderConfig,
 } from "./types";
 import { normalizeFinishReason } from "./finish-reason";
+import { extractJson } from "./extract-json";
 
 /**
  * Custom LLM Server provider that forwards requests to user's endpoint.
@@ -140,7 +141,7 @@ export class CustomLLMProvider implements ILLMProvider {
     }
 
     // Extract JSON from response
-    const extracted = this.extractJson(rawResponse);
+    const extracted = extractJson(rawResponse);
     try {
       const content = this.safeJsonParse(extracted);
       return { rawResponse, content };
@@ -156,54 +157,6 @@ export class CustomLLMProvider implements ILLMProvider {
       );
       throw new Error(`${msg}\n---RAW---\n${rawResponse.slice(0, 1000)}`);
     }
-  }
-
-  /**
-   * Extract JSON from response that might contain extra text,
-   * markdown code blocks, or thinking tokens.
-   */
-  private extractJson(text: string): string {
-    // Strip thinking blocks (Qwen3 etc.) — <think>...</think>
-    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-
-    // Try to find JSON in code blocks first
-    const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeBlockMatch) {
-      try {
-        JSON.parse(codeBlockMatch[1]!.trim());
-        return codeBlockMatch[1]!.trim();
-      } catch {
-        // Continue to other methods
-      }
-    }
-
-    // Strip any remaining markdown fences
-    cleaned = cleaned
-      .replace(/```(?:json)?\s*/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-    // Try direct parse
-    try {
-      JSON.parse(cleaned);
-      return cleaned;
-    } catch {
-      // Continue
-    }
-
-    // Try to find raw JSON object or array
-    const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-    if (jsonMatch) {
-      try {
-        JSON.parse(jsonMatch[1]!);
-        return jsonMatch[1]!;
-      } catch {
-        // Continue
-      }
-    }
-
-    // Return cleaned text as last resort
-    return cleaned;
   }
 
   /**

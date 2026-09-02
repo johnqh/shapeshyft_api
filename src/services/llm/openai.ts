@@ -40,12 +40,89 @@ class OpenAIProviderError extends Error {
   }
 }
 
+/**
+ * What a provider calls its cap on generated tokens.
+ *
+ * OpenAI's own newer models reject `max_tokens` outright —
+ * "Unsupported parameter: 'max_tokens' is not supported with this model. Use
+ * 'max_completion_tokens' instead" — while the OpenAI-*compatible* third
+ * parties served by this same class (DeepSeek, Mistral, xAI, Perplexity) know
+ * only `max_tokens`. One class, two vocabularies, so the caller says which.
+ */
+export type TokenLimitParam = "max_tokens" | "max_completion_tokens";
+
+/**
+ * OpenAI models that reject `max_tokens`.
+ *
+ * The reasoning-era families — GPT-5 and the o-series. Everything before them
+ * (GPT-4o, GPT-4.1) still takes `max_tokens`, and every OpenAI-compatible third
+ * party knows only that, so the rule is deliberately narrow rather than
+ * "OpenAI always uses the new name".
+ *
+ * Matched on the family prefix, not an exhaustive list: the point of a family
+ * is that its next member behaves like the last, and a list of exact ids would
+ * be wrong the day one ships.
+ */
+const REQUIRES_MAX_COMPLETION_TOKENS = /^(gpt-5|o[1-9])/i;
+
+/**
+ * What to call the output cap for this provider and model.
+ *
+ * Both halves matter. The provider decides the vocabulary available; the model
+ * decides which of it applies, and the model is chosen per endpoint rather than
+ * per provider — so this cannot be settled when the client is constructed.
+ */
+export function tokenLimitParamFor(
+  isOpenAi: boolean,
+  model: string
+): TokenLimitParam {
+  return isOpenAi && REQUIRES_MAX_COMPLETION_TOKENS.test(model)
+    ? "max_completion_tokens"
+    : "max_tokens";
+}
+
 export class OpenAIProvider implements ILLMProvider {
   readonly providerName = "openai" as const;
   private client: OpenAI;
   private defaultModel: string;
 
-  constructor(config: ProviderConfig) {
+  private disableThinking: boolean;
+
+  /** Whether this client talks to OpenAI itself, or an OpenAI-compatible third party. */
+  private isOpenAi: boolean;
+
+  constructor(
+    config: ProviderConfig,
+    /**
+     * Per-provider quirks. Defaults keep every provider that works today
+     * working; only one known to need otherwise opts out.
+     */
+    options: {
+      /**
+       * Turn the model's chain of thought off.
+       *
+       * DeepSeek V4 reasons by default, and that is measurably the wrong
+       * trade here: the same two-bar plan cost 844 output tokens and 8.6s
+       * thinking, against 126 tokens and 2.4s with it off — and the reasoning
+       * is discarded, so the caller pays for working it never sees. Worse,
+       * thinking mode *rejects* `tool_choice`, so leaving it on also costs the
+       * structured-output guarantee.
+       *
+       * Sent as DeepSeek's native `thinking` object. Its type error on a
+       * boolean — "thinking: invalid type: boolean `false`, expected .." — is
+       * what identified the parameter.
+       */
+      disableThinking?: boolean;
+      /**
+       * True for OpenAI itself. The OpenAI-compatible providers served by this
+       * same class (DeepSeek, Mistral, xAI, Perplexity, Cohere) are not, and
+       * only know `max_tokens`.
+       */
+      isOpenAi?: boolean;
+    } = {}
+  ) {
+    this.disableThinking = options.disableThinking ?? false;
+    this.isOpenAi = options.isOpenAi ?? false;
     if (!config.apiKey) {
       throw new Error("OpenAI API key is required");
     }
@@ -145,8 +222,11 @@ export class OpenAIProvider implements ILLMProvider {
         type: "function",
         function: { name: "structured_response" },
       },
+      // Off where the model reasons by default: thinking mode rejects
+      // `tool_choice` outright, so this is what keeps the line above legal.
+      ...(this.disableThinking ? { thinking: { type: "disabled" } } : {}),
       temperature: request.temperature ?? 0,
-      max_tokens: request.maxTokens,
+      [tokenLimitParamFor(this.isOpenAi, model)]: request.maxTokens,
       stream: false,
     } as OpenAI.Chat.ChatCompletionCreateParams)) as OpenAI.Chat.ChatCompletion;
 
@@ -189,7 +269,33 @@ export class OpenAIProvider implements ILLMProvider {
     }
 
     const rawResponse = toolCall.function.arguments;
-    const content = JSON.parse(rawResponse);
+
+    /*
+      Why the stop reason is read BEFORE parsing.
+
+      A model that hits the output ceiling returns arguments cut off mid-value,
+      and `JSON.parse` then fails with something like "Expected ']'". Read in
+      that order, a truncation is reported to the caller as a malformed model —
+      which is the wrong diagnosis and, worse, not an actionable one: a caller
+      that knows the output was merely *cut* can retry or ask for less, where a
+      caller told the JSON was broken has nothing to act on.
+    */
+    if (response.choices[0]?.finish_reason === "length") {
+      throw new Error(
+        `Model output was truncated at the token limit (finish_reason=length) after ${rawResponse.length} characters. The answer is incomplete; raise max_output_tokens or ask for less in one call.`
+      );
+    }
+
+    let content: unknown;
+    try {
+      content = JSON.parse(rawResponse);
+    } catch (error) {
+      // Not truncated, so genuinely malformed. Carry a head of the payload:
+      // "Unable to parse JSON string" alone leaves nothing to diagnose from.
+      throw new Error(
+        `Model returned unparseable JSON (${error instanceof Error ? error.message : String(error)}). First 300 chars: ${rawResponse.slice(0, 300)}`
+      );
+    }
 
     return {
       content,
@@ -654,7 +760,7 @@ export class OpenAIProvider implements ILLMProvider {
         function: { name: "structured_response" },
       },
       temperature: request.temperature ?? 0,
-      max_tokens: request.maxTokens,
+      [tokenLimitParamFor(this.isOpenAi, model)]: request.maxTokens,
     };
   }
 }

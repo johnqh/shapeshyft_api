@@ -58,7 +58,7 @@ describe("endpoint schemas: output ceiling", () => {
       // An existing unprotected endpoint must stay unprotected unless the
       // operator says otherwise -- update must never re-cap it behind their back.
       const parsed = endpointUpdateSchema.parse({ instructions: "hi" });
-      expect(parsed.max_output_tokens).not.toBe(DEFAULT_MAX_OUTPUT_TOKENS);
+      expect("max_output_tokens" in parsed).toBe(false);
     });
   });
 });

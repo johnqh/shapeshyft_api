@@ -1,28 +1,89 @@
 /**
- * @fileoverview Client IP normalization and provider URL host rewriting
+ * @fileoverview Client IP resolution and provider URL host rewriting
  * @description Supports the provider IP sync route, which points an entity's
  * self-hosted LM Studio providers at whatever address the caller is currently
  * reaching the API from -- dynamic DNS, without the DNS.
  *
- * Kept free of Hono and the database so the address parsing and URL surgery,
- * which is where the sharp edges are, can be tested directly.
+ * Kept free of Hono and the database so the address parsing, URL surgery, and
+ * sync planning -- which is where the sharp edges are -- can be tested directly.
  */
+
+import type {
+  ProviderIpSyncSkipped,
+  ProviderIpSyncUnchanged,
+  ProviderIpSyncUpdated,
+} from "@sudobility/shapeshyft_types";
 
 /** IPv4 dotted quad, each octet 0-255. */
 const IPV4_RE =
   /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 
-/** Loose IPv6 check: hex groups and colons, with an optional embedded IPv4. */
-const IPV6_RE = /^[0-9a-f:]*:[0-9a-f:.]*$/i;
+/** A single IPv6 group: one to four hex digits. */
+const IPV6_GROUP_RE = /^[0-9a-f]{1,4}$/i;
 
 /** Is this an IPv4 literal? */
 export function isIpv4(value: string): boolean {
   return IPV4_RE.test(value);
 }
 
-/** Is this an IPv6 literal? */
+/**
+ * Count the groups on one side of a `::`, or null if the side is malformed.
+ *
+ * An embedded IPv4 tail (`::ffff:1.2.3.4`) is only legal as the final group and
+ * occupies two of the eight, which is why this returns a count rather than a
+ * boolean.
+ */
+function countIpv6Groups(side: string): number | null {
+  if (side === "") return 0;
+
+  const groups = side.split(":");
+  let count = 0;
+
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i]!;
+    if (group === "") return null; // a stray colon, e.g. "a:" or ":a"
+
+    if (group.includes(".")) {
+      // A dotted quad is only an address here in the final position.
+      if (i !== groups.length - 1 || !isIpv4(group)) return null;
+      count += 2;
+      continue;
+    }
+
+    if (!IPV6_GROUP_RE.test(group)) return null;
+    count += 1;
+  }
+
+  return count;
+}
+
+/**
+ * Is this an IPv6 literal?
+ *
+ * Parsed rather than pattern-matched. The regex this replaced accepted `":"`,
+ * `"a:"`, and `"1:2"` as valid, which meant a malformed forwarded header could
+ * be treated as a routable client address and written into a provider URL.
+ *
+ * A zone index (`fe80::1%eth0`) is rejected: it is a valid address but cannot be
+ * used as a URL host, which is the only thing this library does with one.
+ */
 export function isIpv6(value: string): boolean {
-  return value.includes(":") && IPV6_RE.test(value) && !value.endsWith(":::");
+  if (!value.includes(":") || value.includes("%")) return false;
+
+  const sides = value.split("::");
+  if (sides.length > 2) return false; // "::" may appear at most once
+
+  const head = countIpv6Groups(sides[0]!);
+  if (head === null) return false;
+
+  // Uncompressed: all eight groups must be spelled out.
+  if (sides.length === 1) return head === 8;
+
+  const tail = countIpv6Groups(sides[1]!);
+  if (tail === null) return false;
+
+  // "::" must stand in for at least one omitted group.
+  return head + tail <= 7;
 }
 
 /** Is this any IP literal, as opposed to a DNS hostname? */
@@ -303,4 +364,78 @@ export function rewriteUrlHost(rawUrl: string, ip: string): UrlRewrite {
     rawUrl.slice(authorityEnd);
 
   return { status: "updated", url: rewritten };
+}
+
+// =============================================================================
+// Sync planning
+// =============================================================================
+
+/** The provider fields a sync needs; a narrowed `llm_api_keys` row. */
+export interface SyncableProvider {
+  uuid: string;
+  key_name: string;
+  endpoint_url: string | null;
+}
+
+/**
+ * What a sync would do, decided before anything is written.
+ *
+ * `updated` doubles as the write list, so the route's database work is a plain
+ * loop over it inside one transaction -- no branching, nothing to get wrong
+ * halfway through.
+ */
+export interface ProviderSyncPlan {
+  updated: ProviderIpSyncUpdated[];
+  unchanged: ProviderIpSyncUnchanged[];
+  skipped: ProviderIpSyncSkipped[];
+}
+
+/**
+ * Decide what each provider's URL should become, without touching anything.
+ *
+ * Separating the decision from the write keeps the bucketing rules testable
+ * without a database, and lets the route apply every change in a single
+ * transaction rather than one row at a time.
+ *
+ * @param providers - The entity's self-hosted providers
+ * @param ip - The caller's resolved public address
+ * @returns Every provider sorted into exactly one bucket
+ */
+export function planProviderSync(
+  providers: readonly SyncableProvider[],
+  ip: string
+): ProviderSyncPlan {
+  const plan: ProviderSyncPlan = { updated: [], unchanged: [], skipped: [] };
+
+  for (const provider of providers) {
+    const { uuid, key_name } = provider;
+    const current = provider.endpoint_url;
+
+    if (!current) {
+      plan.skipped.push({
+        uuid,
+        key_name,
+        url: null,
+        reason: "endpoint_url is not set",
+      });
+      continue;
+    }
+
+    const result = rewriteUrlHost(current, ip);
+
+    if (result.status === "skipped") {
+      plan.skipped.push({
+        uuid,
+        key_name,
+        url: current,
+        reason: result.reason,
+      });
+    } else if (result.status === "unchanged") {
+      plan.unchanged.push({ uuid, key_name, url: current });
+    } else {
+      plan.updated.push({ uuid, key_name, from: current, to: result.url });
+    }
+  }
+
+  return plan;
 }

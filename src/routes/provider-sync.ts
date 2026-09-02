@@ -17,23 +17,19 @@
 import { Hono, type Context } from "hono";
 import { getConnInfo } from "hono/bun";
 import { and, eq } from "drizzle-orm";
-import { db, llmApiKeys } from "../db";
+import { db, entities, llmApiKeys } from "../db";
 import {
   successResponse,
   errorResponse,
   type ClientIpDiagnostics,
   type ProviderIpSyncResponse,
-  type ProviderIpSyncSkipped,
-  type ProviderIpSyncUnchanged,
-  type ProviderIpSyncUpdated,
 } from "@sudobility/shapeshyft_types";
-import { ENTITY_API_KEY_PERMISSIONS } from "../lib/entity-helpers";
 import {
   collectForwardingHeaders,
   isRoutableClientIp,
   normalizeClientIp,
+  planProviderSync,
   resolveCallerIp,
-  rewriteUrlHost,
 } from "../lib/provider-url";
 
 const providerSyncRouter = new Hono();
@@ -116,13 +112,6 @@ providerSyncRouter.post("/sync-ip", async c => {
   const forbidden = requireEntityKey(c);
   if (forbidden) return forbidden;
 
-  if (!ENTITY_API_KEY_PERMISSIONS.canManageApiKeys) {
-    return c.json(
-      errorResponse("Entity API keys may not manage provider keys"),
-      403
-    );
-  }
-
   const entityId = c.get("entityApiKeyEntityId");
 
   // 2. The caller's address: the peer when they reached us directly, or what
@@ -144,7 +133,20 @@ providerSyncRouter.post("/sync-ip", async c => {
   }
 
   try {
-    // 3. Every self-hosted provider the entity owns, active or not -- an
+    // 3. The entity itself must still exist. Authorisation is inherent -- the
+    // key is bound to this entity and only its rows are ever selected -- but a
+    // key outliving its entity should fail loudly rather than sync nothing.
+    const [entity] = await db
+      .select({ id: entities.id })
+      .from(entities)
+      .where(eq(entities.id, entityId))
+      .limit(1);
+
+    if (!entity) {
+      return c.json(errorResponse("Entity not found"), 404);
+    }
+
+    // 4. Every self-hosted provider the entity owns, active or not -- an
     // inactive provider still needs a correct URL for when it is re-enabled.
     const providers = await db
       .select()
@@ -156,56 +158,24 @@ providerSyncRouter.post("/sync-ip", async c => {
         )
       );
 
-    const updated: ProviderIpSyncUpdated[] = [];
-    const unchanged: ProviderIpSyncUnchanged[] = [];
-    const skipped: ProviderIpSyncSkipped[] = [];
+    // 5. Decide everything before writing anything, then apply the whole plan
+    // in one transaction. A failure partway through would otherwise leave some
+    // providers pointing at the new address and some at the old, with the
+    // caller getting a 500 and no way to tell which.
+    const plan = planProviderSync(providers, clientIp);
 
-    for (const provider of providers) {
-      const current = provider.endpoint_url;
-      if (!current) {
-        skipped.push({
-          uuid: provider.uuid,
-          key_name: provider.key_name,
-          url: null,
-          reason: "endpoint_url is not set",
-        });
-        continue;
-      }
-
-      // 4. Swap only the host, leaving port and path intact.
-      const result = rewriteUrlHost(current, clientIp);
-
-      if (result.status === "skipped") {
-        skipped.push({
-          uuid: provider.uuid,
-          key_name: provider.key_name,
-          url: current,
-          reason: result.reason,
-        });
-        continue;
-      }
-
-      if (result.status === "unchanged") {
-        unchanged.push({
-          uuid: provider.uuid,
-          key_name: provider.key_name,
-          url: current,
-        });
-        continue;
-      }
-
-      await db
-        .update(llmApiKeys)
-        .set({ endpoint_url: result.url, updated_at: new Date() })
-        .where(eq(llmApiKeys.uuid, provider.uuid));
-
-      updated.push({
-        uuid: provider.uuid,
-        key_name: provider.key_name,
-        from: current,
-        to: result.url,
+    if (plan.updated.length > 0) {
+      await db.transaction(async tx => {
+        for (const change of plan.updated) {
+          await tx
+            .update(llmApiKeys)
+            .set({ endpoint_url: change.to, updated_at: new Date() })
+            .where(eq(llmApiKeys.uuid, change.uuid));
+        }
       });
     }
+
+    const { updated, unchanged, skipped } = plan;
 
     console.log("[provider-sync] Synced providers to caller IP:", {
       entityId,

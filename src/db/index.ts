@@ -438,6 +438,25 @@ export async function initDatabase() {
     END $$;
   `;
 
+  // Add max_output_tokens column.
+  // Intentionally nullable with NO default and NO backfill: NULL means "no
+  // runaway protection", and existing endpoints must keep behaving exactly as
+  // they did. Adding a default here would silently cap live endpoints whose
+  // callers depend on longer answers.
+  await client`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'shapeshyft'
+        AND table_name = 'endpoints'
+        AND column_name = 'max_output_tokens'
+      ) THEN
+        ALTER TABLE shapeshyft.endpoints ADD COLUMN max_output_tokens INTEGER;
+      END IF;
+    END $$;
+  `;
+
   console.log("Database tables initialized");
 }
 

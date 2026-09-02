@@ -18,6 +18,7 @@ import type {
   ProviderConfig,
 } from "./types";
 import { isGenerativeModel } from "../../lib/capability-validator";
+import { normalizeFinishReason } from "./finish-reason";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
 
@@ -103,6 +104,9 @@ export class GeminiProvider implements ILLMProvider {
       model: modelName,
       provider: this.providerName,
       latencyMs,
+      finishReason: normalizeFinishReason(
+        response.candidates?.[0]?.finishReason
+      ),
     };
   }
 

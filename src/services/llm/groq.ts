@@ -17,6 +17,7 @@ import type {
 import { createLLMProvider } from "./index";
 import { getProviderForModel } from "../../config/providers";
 import { isTranscriptionModel } from "../../lib/capability-validator";
+import { normalizeFinishReason } from "./finish-reason";
 
 const DEFAULT_MODEL = "llama-3.3-70b-versatile";
 const DEFAULT_WHISPER_MODEL = "whisper-large-v3";
@@ -143,6 +144,8 @@ export class GroqProvider implements ILLMProvider {
         model: model || DEFAULT_WHISPER_MODEL,
         provider: this.providerName,
         latencyMs: transcriptionLatency,
+        // Whisper transcribes to completion; there is no token ceiling to hit.
+        finishReason: "stop",
       };
     }
 
@@ -251,6 +254,7 @@ export class GroqProvider implements ILLMProvider {
       model: response.model,
       provider: this.providerName,
       latencyMs,
+      finishReason: normalizeFinishReason(response.choices[0]?.finish_reason),
     };
   }
 

@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { DEFAULT_MAX_OUTPUT_TOKENS } from "@sudobility/shapeshyft_types";
 
 // =============================================================================
 // Common Param Schemas
@@ -223,6 +224,18 @@ export const endpointCreateSchema = z.object({
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
   web_search: z.boolean().optional().default(false),
+  /**
+   * Output ceiling. Omitted -> DEFAULT_MAX_OUTPUT_TOKENS, so every creation
+   * path (dashboard, API, MCP) gets protection without asking. Explicit null ->
+   * no protection, for the operator who genuinely wants an uncapped endpoint.
+   */
+  max_output_tokens: z
+    .number()
+    .int()
+    .positive()
+    .max(1_000_000)
+    .nullish()
+    .default(DEFAULT_MAX_OUTPUT_TOKENS),
   // For Whisper endpoints: model to use for structured extraction
   transcription_extraction_model: z.string().max(255).nullish(),
 });
@@ -242,6 +255,8 @@ export const endpointUpdateSchema = z.object({
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
   web_search: z.boolean().optional(),
+  /** Omitted -> unchanged; null -> remove the ceiling. */
+  max_output_tokens: z.number().int().positive().max(1_000_000).nullish(),
   // For Whisper endpoints: model to use for structured extraction
   transcription_extraction_model: z.string().max(255).nullish(),
 });

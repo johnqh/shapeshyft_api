@@ -51,6 +51,8 @@ import {
   validateWhisperRequest,
   isTranscriptionModel,
 } from "../lib/capability-validator";
+import { extractReservedFields } from "../lib/reserved-fields";
+import { resolveMaxOutputTokens } from "../lib/output-limit";
 
 const aiRouter = new Hono();
 
@@ -164,34 +166,8 @@ function isIpAllowed(
 // Input Processing Helpers
 // =============================================================================
 
-/**
- * Extract and remove the "context" field from input data.
- * If present, this context overrides the endpoint's configured context.
- * @returns The extracted context (or undefined) and the cleaned input without the context field
- */
-function extractContextOverride(inputData: unknown): {
-  contextOverride: string | undefined;
-  cleanedInput: unknown;
-} {
-  if (
-    typeof inputData !== "object" ||
-    inputData === null ||
-    Array.isArray(inputData)
-  ) {
-    return { contextOverride: undefined, cleanedInput: inputData };
-  }
-
-  const input = inputData as Record<string, unknown>;
-  const { context, ...rest } = input;
-
-  // Only use context if it's a non-empty string
-  const contextOverride =
-    typeof context === "string" && context.trim().length > 0
-      ? context
-      : undefined;
-
-  return { contextOverride, cleanedInput: rest };
-}
+// Reserved input fields (context, web_search, max_output_tokens) are pulled out
+// by extractReservedFields in ../lib/reserved-fields.
 
 // =============================================================================
 // Shared Validation Logic
@@ -257,30 +233,21 @@ function getTestMode(c: any): boolean {
 }
 
 /**
- * Resolve whether web search should be enabled.
- * The endpoint config is the default. If the request body includes a
- * `web_search` boolean, it can only disable search (not enable it on
- * an endpoint that doesn't support it).
- */
-/**
- * Resolve whether web search should be enabled and strip the
- * `web_search` field from inputData so it doesn't leak into the prompt.
+ * Resolve whether web search runs for this call.
+ *
+ * The endpoint config is the gate: a caller can only ever turn search *off*,
+ * never on for an endpoint that does not have it enabled.
+ *
+ * @param endpointDefault - The endpoint's `web_search` setting
+ * @param callerPreference - The caller's preference, already extracted from the
+ *   input by `extractReservedFields`; undefined when they expressed none
  */
 function resolveWebSearch(
   endpointDefault: boolean,
-  inputData: unknown
+  callerPreference: boolean | undefined
 ): boolean {
   if (!endpointDefault) return false;
-  if (
-    typeof inputData === "object" &&
-    inputData !== null &&
-    "web_search" in inputData
-  ) {
-    const value = (inputData as Record<string, unknown>).web_search !== false;
-    delete (inputData as Record<string, unknown>).web_search;
-    return value;
-  }
-  return true;
+  return callerPreference ?? true;
 }
 
 /**
@@ -579,8 +546,9 @@ async function handlePromptRequest(c: any) {
     return rateLimitResponse;
   }
 
-  // Extract context override from input (if provided)
-  const { contextOverride, cleanedInput } = extractContextOverride(inputData);
+  // Strip reserved fields so the preview matches what an invocation would send
+  const { context: contextOverride, cleanedInput } =
+    extractReservedFields(inputData);
 
   // Generate the combined prompt using ApiHelper
   // Use context override if provided, otherwise use endpoint's configured context
@@ -619,13 +587,28 @@ async function handleAIRequest(c: any) {
     return rateLimitResponse;
   }
 
-  // Extract context override from input (if provided)
-  const { contextOverride, cleanedInput: inputWithoutContext } =
-    extractContextOverride(inputData);
+  // Pull out every reserved field in one pass, before anything builds a prompt
+  const {
+    context: contextOverride,
+    webSearch: webSearchPreference,
+    maxOutputTokens: requestedMaxOutputTokens,
+    cleanedInput: inputWithoutReserved,
+  } = extractReservedFields(inputData);
 
-  // Extract media from input data (after removing context field)
+  // Resolve the output ceiling: the caller may lower the endpoint's limit but
+  // never raise it. A malformed value fails the request rather than silently
+  // leaving the caller unprotected.
+  const ceiling = resolveMaxOutputTokens(
+    endpoint.max_output_tokens,
+    requestedMaxOutputTokens
+  );
+  if (!ceiling.ok) {
+    return c.json(errorResponse(ceiling.error), 400);
+  }
+
+  // Extract media from input data (after removing reserved fields)
   const extractionResult = extractMediaFromInput(
-    inputWithoutContext as Record<string, unknown>
+    inputWithoutReserved as Record<string, unknown>
   );
   if (extractionResult.error) {
     return c.json(errorResponse(extractionResult.error), 400);
@@ -701,7 +684,13 @@ async function handleAIRequest(c: any) {
     model,
     media: media.length > 0 ? media : undefined,
     expectsMediaOutput: expectsMediaOutput ?? undefined,
-    webSearch: resolveWebSearch(endpoint.web_search ?? false, inputData),
+    webSearch: resolveWebSearch(
+      endpoint.web_search ?? false,
+      webSearchPreference
+    ),
+    // null means the endpoint opted out of runaway protection; the providers
+    // treat undefined as "no limit".
+    maxTokens: ceiling.value ?? undefined,
   };
 
   const llmRequest: LLMRequest =
@@ -775,6 +764,10 @@ async function handleAIRequest(c: any) {
       request_metadata: {
         model: llmResponse.model,
         provider: llmResponse.provider,
+        ...(llmResponse.finishReason
+          ? { finish_reason: llmResponse.finishReason }
+          : {}),
+        ...(ceiling.value !== null ? { max_output_tokens: ceiling.value } : {}),
       },
     });
 
@@ -786,8 +779,24 @@ async function handleAIRequest(c: any) {
         tokens_output: llmResponse.usage.completionTokens,
         latency_ms: llmResponse.latencyMs,
         estimated_cost_cents: costCents,
+        ...(llmResponse.finishReason
+          ? { finish_reason: llmResponse.finishReason }
+          : {}),
       },
     };
+
+    // Hitting the ceiling means `output` is a truncated answer that will
+    // usually fail the caller's schema validation. Saying so explicitly is what
+    // lets a caller tell "the model ran away" from "the model returned
+    // something unparseable" -- different faults, different correct responses.
+    if (llmResponse.finishReason === "length") {
+      response.truncated = true;
+      console.warn("[AI] Output truncated at token ceiling:", {
+        endpoint: endpoint.endpoint_name,
+        maxOutputTokens: ceiling.value,
+        tokensOutput: llmResponse.usage.completionTokens,
+      });
+    }
 
     // Include generated media if present
     if (llmResponse.generatedMedia && llmResponse.generatedMedia.length > 0) {

@@ -21,6 +21,7 @@ import storageRouter from "./storage";
 import usersRouter from "./users";
 import userApiKeysRouter from "./user-api-keys";
 import entityApiKeysRouter from "./entity-api-keys";
+import providerSyncRouter from "./provider-sync";
 
 const routes = new Hono();
 
@@ -32,6 +33,9 @@ routes.route("/providers", providersRouter);
 // Admin routes (Firebase auth required)
 const adminRoutes = new Hono();
 adminRoutes.use("*", firebaseAuthMiddleware);
+// Registered before "/entities" so the literal "self" is matched here rather
+// than being taken for an entity slug by entitiesRouter's "/:entitySlug".
+adminRoutes.route("/entities/self/providers", providerSyncRouter);
 adminRoutes.route("/entities/:entitySlug/keys", keysRouter);
 adminRoutes.route("/entities/:entitySlug/api-keys", entityApiKeysRouter);
 adminRoutes.route("/entities/:entitySlug/storage", storageRouter);
@@ -67,4 +71,5 @@ export {
   usersRouter,
   userApiKeysRouter,
   entityApiKeysRouter,
+  providerSyncRouter,
 };

@@ -5,6 +5,7 @@
  */
 
 import type {
+  FinishReason,
   JsonSchema,
   LlmProvider,
   MediaContent,
@@ -99,6 +100,12 @@ export interface LLMResponse {
   model: string;
   provider: LlmProvider;
   latencyMs: number;
+  /**
+   * Why the model stopped, normalized across providers. `"length"` means the
+   * output ceiling was hit and `content` is truncated. Undefined when the
+   * provider reported nothing usable.
+   */
+  finishReason?: FinishReason;
   /** Generated media (images, audio, video) from generative models */
   generatedMedia?: GeneratedMedia[];
 }

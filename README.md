@@ -7,25 +7,39 @@ Backend API server for ShapeShyft, an LLM structured output platform.
 ```bash
 bun install
 cp .env.example .env.local   # Configure DATABASE_URL, Firebase, ENCRYPTION_KEY
-bun run db:init              # Initialize database tables
+bun run db:init              # Create schema, tables, and indexes (idempotent)
 bun run dev                  # Start dev server (port 3000)
+
+# db:init is optional -- the same initDatabase() runs on every server boot.
+# Run it when you want the schema applied without starting the server, such as
+# preparing a fresh database or applying new columns in a release step.
 ```
 
 ## Usage
 
 ```bash
-# Public: Execute an AI endpoint (project API key auth)
-curl -X POST https://api.shapeshyft.ai/api/v1/ai/org/project/endpoint/invoke \
-  -H "X-API-Key: your-key" -H "Content-Type: application/json" \
+# Public: Execute an AI endpoint (project API key auth).
+# The path is /ai/<entity-slug>/<project>/<endpoint> -- there is no /invoke suffix.
+curl -X POST https://api.shapeshyft.ai/api/v1/ai/my-org/my-project/my-endpoint \
+  -H "Authorization: Bearer sk_live_..." -H "Content-Type: application/json" \
+  -d '{"text": "Classify this text"}'
+
+# Public: see the prompt that endpoint would send, without calling the LLM
+curl -X POST https://api.shapeshyft.ai/api/v1/ai/my-org/my-project/my-endpoint/prompt \
+  -H "Authorization: Bearer sk_live_..." -H "Content-Type: application/json" \
   -d '{"text": "Classify this text"}'
 
 # Admin: List projects (Firebase auth)
-curl https://api.shapeshyft.ai/api/v1/entities/org/projects \
+curl https://api.shapeshyft.ai/api/v1/entities/my-org/projects \
   -H "Authorization: Bearer <firebase-token>"
 
 # Admin: the same call with a personal API key
-curl https://api.shapeshyft.ai/api/v1/entities/org/projects \
+curl https://api.shapeshyft.ai/api/v1/entities/my-org/projects \
   -H "X-API-Key: shyft_..."
+
+# Admin: the same call as the workspace itself, with an entity API key
+curl https://api.shapeshyft.ai/api/v1/entities/my-org/projects \
+  -H "X-API-Key: shyftent_..."
 
 # Create a personal API key (Firebase token required)
 curl -X POST https://api.shapeshyft.ai/api/v1/users/<uid>/api-keys \
@@ -35,10 +49,15 @@ curl -X POST https://api.shapeshyft.ai/api/v1/users/<uid>/api-keys \
 
 ## Routes
 
-- **Public** (`/api/v1/ai/*`, `/api/v1/providers/*`) -- AI inference and provider catalog (project API key auth)
-- **Admin** (`/api/v1/entities/*`, `/api/v1/users/*`) -- Full CRUD for entities, projects, endpoints, keys, analytics, settings (Firebase ID token **or** a personal `shyft_...` API key)
+- **Health** (`/`, `/health`, `/health/ready`) -- unauthenticated; `ready` verifies the database
+- **Public** (`/api/v1/ai/*`, `/api/v1/providers/*`) -- AI invocation and provider catalog. The AI routes take a project API key (`sk_live_...`) via `Authorization: Bearer` or `?api_key=`, with an optional per-endpoint IPv4 allowlist.
+- **Admin** (`/api/v1/entities/*`, `/api/v1/users/*`, `/api/v1/ratelimits/*`, `/api/v1/invitations/*`) -- Full CRUD for entities, projects, endpoints, keys, analytics, settings. Accepts a Firebase ID token, a personal `shyft_...` key, **or** an entity `shyftent_...` key (the last is limited to `/entities/*` paths and cannot manage API keys).
 
 Supports 10 LLM providers: OpenAI, Anthropic, Gemini, Groq, Mistral, xAI, DeepSeek, Perplexity, Cohere, LM Studio.
+
+> Cohere is in the catalog but is currently routed through the OpenAI-compatible
+> provider, which its API does not match. It will not work until it gets a
+> dedicated provider class.
 
 ## Development
 

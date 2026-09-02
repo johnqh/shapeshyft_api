@@ -4,6 +4,7 @@ import type {
   LLMResponse,
   ProviderConfig,
 } from "./types";
+import { normalizeFinishReason } from "./finish-reason";
 
 /**
  * Custom LLM Server provider that forwards requests to user's endpoint.
@@ -72,6 +73,12 @@ export class CustomLLMProvider implements ILLMProvider {
       model: request.model ?? "custom",
       provider: this.providerName,
       latencyMs,
+      finishReason: normalizeFinishReason(
+        (
+          (result.choices as Array<Record<string, unknown>> | undefined)?.[0] ??
+          {}
+        ).finish_reason
+      ),
     };
   }
 

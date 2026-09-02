@@ -7,7 +7,11 @@
  */
 
 import OpenAI from "openai";
-import type { GeneratedMedia, JsonSchema } from "@sudobility/shapeshyft_types";
+import type {
+  FinishReason,
+  GeneratedMedia,
+  JsonSchema,
+} from "@sudobility/shapeshyft_types";
 import {
   requiresEntityId,
   type ILLMProvider,
@@ -22,6 +26,7 @@ import {
   buildResponseFormatSection,
   buildWebSearchRoutingSection,
 } from "../../lib/prompt-builder";
+import { normalizeFinishReason } from "./finish-reason";
 
 const DEFAULT_MODEL = "gpt-4o-mini";
 
@@ -197,6 +202,7 @@ export class OpenAIProvider implements ILLMProvider {
       model: response.model,
       provider: this.providerName,
       latencyMs,
+      finishReason: normalizeFinishReason(response.choices[0]?.finish_reason),
       generatedMedia: generatedMedia.length > 0 ? generatedMedia : undefined,
     };
   }
@@ -281,6 +287,7 @@ export class OpenAIProvider implements ILLMProvider {
     rawResponse: string;
     usage: { inputTokens: number; outputTokens: number };
     model: string;
+    finishReason?: FinishReason;
   }> {
     console.log(
       `[web-search] callResponsesStructured() calling Responses API, model=${model}`
@@ -332,6 +339,12 @@ export class OpenAIProvider implements ILLMProvider {
         outputTokens: response.usage?.output_tokens ?? 0,
       },
       model: response.model,
+      // The Responses API reports truncation as an incomplete status with a
+      // reason, rather than a finish_reason on the choice.
+      finishReason:
+        response.status === "incomplete"
+          ? normalizeFinishReason(response.incomplete_details?.reason)
+          : "stop",
     };
   }
 
@@ -502,6 +515,7 @@ export class OpenAIProvider implements ILLMProvider {
         model: triageResult.model,
         provider: this.providerName,
         latencyMs: Date.now() - startTime,
+        finishReason: triageResult.finishReason,
       };
     }
 
@@ -563,6 +577,7 @@ export class OpenAIProvider implements ILLMProvider {
       model: structureResult.model,
       provider: this.providerName,
       latencyMs: Date.now() - startTime,
+      finishReason: structureResult.finishReason,
     };
   }
 

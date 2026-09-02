@@ -12,6 +12,7 @@ import type {
   LLMResponse,
   ProviderConfig,
 } from "./types";
+import { normalizeFinishReason } from "./finish-reason";
 
 // Fallback when an endpoint doesn't pin a model. claude-sonnet-4-20250514 is
 // deprecated (retires 2026-06-15); use a current, non-deprecated Sonnet-tier id.
@@ -121,6 +122,7 @@ export class AnthropicProvider implements ILLMProvider {
       model: response.model,
       provider: this.providerName,
       latencyMs,
+      finishReason: normalizeFinishReason(response.stop_reason),
     };
   }
 

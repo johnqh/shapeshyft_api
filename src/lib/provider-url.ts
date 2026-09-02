@@ -80,6 +80,63 @@ export function isRoutableClientIp(ip: string): boolean {
   return true;
 }
 
+/**
+ * Resolve who is really calling, given the connection's peer and its headers.
+ *
+ * A forwarded header is written by whoever is upstream, so it is only worth
+ * anything once we know the hop that sent it is our own infrastructure. The
+ * peer address settles that: an attacker on the internet cannot make their TCP
+ * connection appear to originate from a private address.
+ *
+ * - **Public peer** -- the client reached us directly. Use the peer and ignore
+ *   every header, forged or not.
+ * - **Private or loopback peer** -- we are behind our own reverse proxy
+ *   (Traefik on the Docker network, in this deployment). Read the client from
+ *   the forwarded headers it set.
+ *
+ * Within `X-Forwarded-For`, entries are read **right to left**, taking the
+ * first public one. Each proxy appends the address that connected to it, so
+ * everything on the right was written by trusted infrastructure while the
+ * leftmost entries may have been supplied by the client. Traefik currently
+ * strips client-sent forwarded headers (it has no `trustedIPs` configured), but
+ * reading from the right stays correct if that ever changes.
+ *
+ * @param peerAddress - The connection's peer, from `getConnInfo(c).remote.address`
+ * @param getHeader - Case-insensitive header lookup
+ * @returns The caller's IP, or null when it cannot be established
+ */
+export function resolveCallerIp(
+  peerAddress: string | null | undefined,
+  getHeader: (name: string) => string | undefined
+): string | null {
+  const peer = normalizeClientIp(peerAddress);
+  if (!peer) return null;
+
+  // A public peer is the client itself. Headers add nothing and can only lie.
+  if (isRoutableClientIp(peer)) {
+    return peer;
+  }
+
+  // Private peer: a hop inside our own network, so its headers are worth reading.
+  const forwardedFor = getHeader("x-forwarded-for");
+  if (forwardedFor) {
+    const hops = forwardedFor.split(",");
+    for (let i = hops.length - 1; i >= 0; i--) {
+      const candidate = normalizeClientIp(hops[i]!.trim());
+      if (candidate && isRoutableClientIp(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  const realIp = normalizeClientIp(getHeader("x-real-ip"));
+  if (realIp && isRoutableClientIp(realIp)) {
+    return realIp;
+  }
+
+  return null;
+}
+
 /** Outcome of rewriting one provider URL. */
 export type UrlRewrite =
   | { status: "updated"; url: string }

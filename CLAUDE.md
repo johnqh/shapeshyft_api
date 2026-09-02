@@ -397,13 +397,26 @@ without the DNS, for a model server on a home connection.
 - **Entity API key only.** The entity comes from the key, so the caller sends no
   body and needs to know neither its slug nor its own address. A Firebase token
   is rejected: a browser's peer address says nothing about where the provider runs.
-- **The address comes from the TCP peer**, via `getConnInfo()` from `hono/bun`,
-  never from a header. `X-Forwarded-For` is client-written, so honouring it would
-  let a key holder aim a provider URL at any address the API server can reach.
+- **The address is resolved by `resolveCallerIp`**, which decides how much to
+  trust the request based on the TCP peer from `getConnInfo()` (`hono/bun`).
   Under Bun an IPv4 peer arrives IPv6-mapped (`::ffff:1.2.3.4`) and is unwrapped.
-- **Loopback, private, and link-local peers are refused** with 400 -- not as a
-  security control (the peer cannot be forged) but because storing such an address
-  would leave the provider unreachable.
+  - **Public peer** -- the client reached the API directly. The peer is used and
+    every forwarded header is ignored, forged or not.
+  - **Private or loopback peer** -- the request came through our own reverse
+    proxy (Traefik, on the Docker network in the `sudobility_dockerized`
+    deployment), so `X-Forwarded-For` / `X-Real-Ip` are read. An attacker cannot
+    make their connection originate from inside that network, which is what
+    makes the header trustworthy *only* on this branch.
+  - `X-Forwarded-For` is read **right to left**, taking the first public entry.
+    Each proxy appends the address that connected to it, so the right-hand
+    entries were written by trusted infrastructure while the leftmost may have
+    come from the client. Traefik currently strips client-sent forwarded headers
+    (no `trustedIPs` configured), but reading from the right survives that
+    changing.
+- **Only a public address is ever returned.** A loopback, private, or link-local
+  result is reported as "could not determine" rather than written into a provider
+  URL, where it would resolve nowhere useful. The route therefore does no
+  routability check of its own -- `resolveCallerIp` guarantees it.
 - **Only the host is replaced.** Scheme, credentials, port, path, query, and
   fragment survive byte for byte, because `rewriteUrlHost` splices the string
   rather than round-tripping through `URL.toString()`, which would drop a default

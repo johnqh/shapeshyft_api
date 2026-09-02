@@ -7,10 +7,11 @@
  * the machine calls this endpoint (from a cron job, or on boot) and its stored
  * provider URLs follow it, without anyone editing a dashboard.
  *
- * The address is taken from the TCP peer, never from a header. `X-Forwarded-For`
- * is written by the client, so honouring it would let anyone holding the key
- * aim a provider URL at an address of their choosing -- including one only the
- * API server can reach. The peer address cannot be forged that way.
+ * The address comes from the TCP peer whenever the client reached the API
+ * directly. A forwarded header is honoured only when the peer is itself a
+ * private address, which means the request arrived through our own reverse
+ * proxy -- an attacker on the internet cannot make their connection appear to
+ * come from inside the Docker network. See `resolveCallerIp`.
  */
 
 import { Hono, type Context } from "hono";
@@ -26,11 +27,7 @@ import {
   type ProviderIpSyncUpdated,
 } from "@sudobility/shapeshyft_types";
 import { ENTITY_API_KEY_PERMISSIONS } from "../lib/entity-helpers";
-import {
-  isRoutableClientIp,
-  normalizeClientIp,
-  rewriteUrlHost,
-} from "../lib/provider-url";
+import { resolveCallerIp, rewriteUrlHost } from "../lib/provider-url";
 
 const providerSyncRouter = new Hono();
 
@@ -82,21 +79,19 @@ providerSyncRouter.post("/sync-ip", async c => {
     return c.json(errorResponse("API key is not bound to an entity"), 403);
   }
 
-  // 2. The caller's address, from the connection rather than any header.
-  const clientIp = normalizeClientIp(readPeerAddress(c));
+  // 2. The caller's address: the peer when they reached us directly, or what
+  // our own proxy forwarded when they did not.
+  // resolveCallerIp only ever yields a public address -- a loopback, private, or
+  // link-local result is reported as "could not determine" rather than being
+  // written into a provider URL, where it would resolve nowhere useful.
+  const clientIp = resolveCallerIp(readPeerAddress(c), name =>
+    c.req.header(name)
+  );
   if (!clientIp) {
     return c.json(
-      errorResponse("Could not determine the caller's IP address"),
-      400
-    );
-  }
-
-  if (!isRoutableClientIp(clientIp)) {
-    return c.json(
       errorResponse(
-        `Refusing to sync to ${clientIp}: loopback, private, and link-local ` +
-          "addresses would leave the providers unreachable. This usually means " +
-          "the request did not arrive directly from the internet."
+        "Could not determine the caller's IP address. If this API sits behind " +
+          "a reverse proxy, the proxy must set X-Forwarded-For or X-Real-Ip."
       ),
       400
     );

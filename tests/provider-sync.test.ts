@@ -99,12 +99,15 @@ describe("POST /entities/self/providers/sync-ip", () => {
     expect(res.status).toBe(401);
   });
 
-  it("refuses to sync to a private address", async () => {
-    const res = await post({ "X-API-Key": apiKey }, "192.168.1.50");
+  it("refuses when a proxy forwards only internal addresses", async () => {
+    const res = await post(
+      { "X-API-Key": apiKey, "X-Forwarded-For": "10.0.0.1, 192.168.1.50" },
+      "172.18.0.2"
+    );
     const body = (await res.json()) as SyncBody;
 
     expect(res.status).toBe(400);
-    expect(body.error).toContain("192.168.1.50");
+    expect(body.error).toContain("Could not determine");
   });
 
   it("ignores a spoofed X-Forwarded-For and uses the real peer", async () => {
@@ -171,6 +174,67 @@ describe("POST /entities/self/providers/sync-ip", () => {
       .where(eq(llmApiKeys.uuid, ids["other-provider"]!));
 
     expect(row!.endpoint_url).toBe("http://142.254.88.249:9000/v1");
+  });
+
+  describe("behind a reverse proxy, as in the Docker deployment", () => {
+    const PROXY_PEER = "172.18.0.2";
+    const PROXIED_CLIENT = "142.254.88.197";
+
+    it("uses the address the proxy forwarded", async () => {
+      const res = await post(
+        { "X-API-Key": apiKey, "X-Forwarded-For": PROXIED_CLIENT },
+        PROXY_PEER
+      );
+      const body = (await res.json()) as SyncBody;
+
+      expect(res.status).toBe(200);
+      expect(body.data!.client_ip).toBe(PROXIED_CLIENT);
+
+      const [row] = await db
+        .select()
+        .from(llmApiKeys)
+        .where(eq(llmApiKeys.uuid, ids["ip-url"]!));
+      expect(row!.endpoint_url).toBe(`http://${PROXIED_CLIENT}:9000/v1`);
+    });
+
+    it("takes the rightmost entry, so a client-prepended value cannot win", async () => {
+      const res = await post(
+        {
+          "X-API-Key": apiKey,
+          "X-Forwarded-For": `169.254.169.254, ${PROXIED_CLIENT}`,
+        },
+        PROXY_PEER
+      );
+      const body = (await res.json()) as SyncBody;
+
+      expect(body.data!.client_ip).toBe(PROXIED_CLIENT);
+    });
+
+    it("falls back to X-Real-Ip", async () => {
+      const res = await post(
+        { "X-API-Key": apiKey, "X-Real-Ip": PROXIED_CLIENT },
+        PROXY_PEER
+      );
+      const body = (await res.json()) as SyncBody;
+
+      expect(body.data!.client_ip).toBe(PROXIED_CLIENT);
+    });
+
+    it("refuses when the proxy forwarded nothing", async () => {
+      const res = await post({ "X-API-Key": apiKey }, PROXY_PEER);
+      const body = (await res.json()) as SyncBody;
+
+      expect(res.status).toBe(400);
+      expect(body.error).toContain("reverse proxy");
+    });
+
+    it("restores the fixture for the remaining tests", async () => {
+      const res = await post(
+        { "X-API-Key": apiKey, "X-Forwarded-For": CALLER_IP },
+        PROXY_PEER
+      );
+      expect(res.status).toBe(200);
+    });
   });
 
   it("is idempotent: a second sync reports everything unchanged", async () => {

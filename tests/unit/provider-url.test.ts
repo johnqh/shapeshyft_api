@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeClientIp,
   isRoutableClientIp,
+  resolveCallerIp,
   rewriteUrlHost,
 } from "../../src/lib/provider-url";
 
@@ -147,5 +148,122 @@ describe("rewriteUrlHost", () => {
     ["scheme only", "http://"],
   ])("skips a %s URL rather than throwing", (_label, url) => {
     expect(rewriteUrlHost(url, "5.6.7.8").status).toBe("skipped");
+  });
+});
+
+describe("resolveCallerIp", () => {
+  const headers = (h: Record<string, string>) => (name: string) =>
+    h[name.toLowerCase()];
+  const none = () => undefined;
+
+  describe("direct connection from the internet", () => {
+    it("uses the peer address", () => {
+      expect(resolveCallerIp("142.254.88.21", none)).toBe("142.254.88.21");
+    });
+
+    it("ignores a forged X-Forwarded-For, because the peer is not a proxy", () => {
+      const result = resolveCallerIp(
+        "142.254.88.21",
+        headers({ "x-forwarded-for": "169.254.169.254" })
+      );
+      expect(result).toBe("142.254.88.21");
+    });
+
+    it("ignores a forged X-Real-Ip too", () => {
+      const result = resolveCallerIp(
+        "142.254.88.21",
+        headers({ "x-real-ip": "10.0.0.1" })
+      );
+      expect(result).toBe("142.254.88.21");
+    });
+
+    it("unwraps an IPv6-mapped peer", () => {
+      expect(resolveCallerIp("::ffff:142.254.88.21", none)).toBe(
+        "142.254.88.21"
+      );
+    });
+  });
+
+  describe("behind a trusted proxy, which is what a private peer means", () => {
+    it("reads the client from X-Forwarded-For", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({ "x-forwarded-for": "142.254.88.197" })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("takes the rightmost public entry, not the client-controlled leftmost", () => {
+      // A client that sends its own header gets it preserved on the left when a
+      // proxy appends; only what the proxy appended can be trusted.
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({ "x-forwarded-for": "169.254.169.254, 142.254.88.197" })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("skips further internal hops when walking right to left", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({ "x-forwarded-for": "1.2.3.4, 142.254.88.197, 172.18.0.5" })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("falls back to X-Real-Ip when there is no X-Forwarded-For", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({ "x-real-ip": "142.254.88.197" })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("prefers X-Forwarded-For over X-Real-Ip", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({
+          "x-forwarded-for": "142.254.88.197",
+          "x-real-ip": "9.9.9.9",
+        })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("returns null when the proxy forwarded nothing usable", () => {
+      expect(resolveCallerIp("172.18.0.2", none)).toBeNull();
+      expect(
+        resolveCallerIp("172.18.0.2", headers({ "x-forwarded-for": "garbage" }))
+      ).toBeNull();
+    });
+
+    it("returns null when every forwarded entry is itself internal", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({ "x-forwarded-for": "10.0.0.1, 172.18.0.5" })
+      );
+      expect(result).toBeNull();
+    });
+
+    it("treats loopback as a trusted hop, for a proxy on the same host", () => {
+      const result = resolveCallerIp(
+        "127.0.0.1",
+        headers({ "x-forwarded-for": "142.254.88.197" })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+
+    it("tolerates the spacing proxies actually emit", () => {
+      const result = resolveCallerIp(
+        "172.18.0.2",
+        headers({ "x-forwarded-for": "  142.254.88.197  " })
+      );
+      expect(result).toBe("142.254.88.197");
+    });
+  });
+
+  it("returns null when there is no peer address at all", () => {
+    expect(resolveCallerIp(null, none)).toBeNull();
+    expect(resolveCallerIp(undefined, none)).toBeNull();
   });
 });

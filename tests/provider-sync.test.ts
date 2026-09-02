@@ -22,6 +22,12 @@ app.route("/api/v1", routes);
 const SYNC_PATH = "http://localhost/api/v1/entities/self/providers/sync-ip";
 const CALLER_IP = "142.254.88.21";
 
+const diagUser: MockFirebaseUser = {
+  uid: "test-provider-diag-uid",
+  email: "provider-diag@example.com",
+  displayName: "Provider Diag",
+};
+
 const syncUser: MockFirebaseUser = {
   uid: "test-provider-sync-uid",
   email: "provider-sync@example.com",
@@ -44,6 +50,104 @@ const post = (headers: Record<string, string>, peerIp: string) =>
     new Request(SYNC_PATH, { method: "POST", headers }),
     serverReporting(peerIp)
   );
+
+const DIAG_PATH = "http://localhost/api/v1/entities/self/providers/client-ip";
+
+describe("GET /entities/self/providers/client-ip", () => {
+  let apiKey: string;
+  let entityId: string;
+
+  beforeAll(async () => {
+    await cleanupTestUser(diagUser.uid);
+    const { user, entity } = await createTestUserWithEntity(diagUser);
+    entityId = entity.id;
+    const created = await entityHelpers.apiKeys!.createKey(
+      entity.id,
+      user.firebase_uid,
+      "diag key"
+    );
+    apiKey = (created as { key: string }).key;
+  });
+
+  afterAll(async () => {
+    await db.delete(llmApiKeys).where(eq(llmApiKeys.entity_id, entityId));
+    await cleanupTestUser(diagUser.uid);
+  });
+
+  const get = (headers: Record<string, string>, peerIp: string) =>
+    app.fetch(
+      new Request(DIAG_PATH, { method: "GET", headers }),
+      serverReporting(peerIp)
+    );
+
+  it("requires an entity API key", async () => {
+    const res = await get({}, "142.254.88.21");
+    expect(res.status).toBe(401);
+  });
+
+  it("reports the peer and what would be resolved", async () => {
+    const res = await get({ "X-API-Key": apiKey }, "142.254.88.21");
+    const body = (await res.json()) as {
+      data: {
+        peer: string;
+        peer_is_public: boolean;
+        resolved_ip: string;
+        forwarding_headers: Record<string, string>;
+      };
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.data.peer).toBe("142.254.88.21");
+    expect(body.data.peer_is_public).toBe(true);
+    expect(body.data.resolved_ip).toBe("142.254.88.21");
+  });
+
+  it("echoes the forwarding headers a proxy chain sent", async () => {
+    const res = await get(
+      {
+        "X-API-Key": apiKey,
+        "X-Forwarded-For": "172.71.30.128",
+        "CF-Connecting-IP": "142.254.88.197",
+      },
+      "172.18.0.2"
+    );
+    const body = (await res.json()) as {
+      data: { forwarding_headers: Record<string, string> };
+    };
+
+    expect(body.data.forwarding_headers["x-forwarded-for"]).toBe(
+      "172.71.30.128"
+    );
+    expect(body.data.forwarding_headers["cf-connecting-ip"]).toBe(
+      "142.254.88.197"
+    );
+  });
+
+  it("never echoes the caller's API key back", async () => {
+    const res = await get(
+      { "X-API-Key": apiKey, Authorization: "Bearer should-not-appear" },
+      "142.254.88.21"
+    );
+    const raw = await res.text();
+
+    expect(raw).not.toContain(apiKey);
+    expect(raw).not.toContain("should-not-appear");
+  });
+
+  it("changes nothing", async () => {
+    const before = await db
+      .select()
+      .from(llmApiKeys)
+      .where(eq(llmApiKeys.entity_id, entityId));
+    await get({ "X-API-Key": apiKey }, "142.254.88.21");
+    const after = await db
+      .select()
+      .from(llmApiKeys)
+      .where(eq(llmApiKeys.entity_id, entityId));
+
+    expect(after).toEqual(before);
+  });
+});
 
 describe("POST /entities/self/providers/sync-ip", () => {
   let entityId: string;

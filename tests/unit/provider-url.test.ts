@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  collectForwardingHeaders,
   normalizeClientIp,
   isRoutableClientIp,
   resolveCallerIp,
@@ -265,5 +266,55 @@ describe("resolveCallerIp", () => {
   it("returns null when there is no peer address at all", () => {
     expect(resolveCallerIp(null, none)).toBeNull();
     expect(resolveCallerIp(undefined, none)).toBeNull();
+  });
+});
+
+describe("collectForwardingHeaders", () => {
+  const from = (h: Record<string, string>) => (name: string) =>
+    h[name.toLowerCase()];
+
+  it("collects the headers that carry a client address", () => {
+    const result = collectForwardingHeaders(
+      from({
+        "x-forwarded-for": "1.2.3.4",
+        "cf-connecting-ip": "5.6.7.8",
+        "x-real-ip": "9.9.9.9",
+      })
+    );
+
+    expect(result).toEqual({
+      "x-forwarded-for": "1.2.3.4",
+      "cf-connecting-ip": "5.6.7.8",
+      "x-real-ip": "9.9.9.9",
+    });
+  });
+
+  it("omits headers that are absent rather than reporting them empty", () => {
+    expect(collectForwardingHeaders(from({ "x-real-ip": "9.9.9.9" }))).toEqual({
+      "x-real-ip": "9.9.9.9",
+    });
+  });
+
+  it("returns an empty object when nothing was forwarded", () => {
+    expect(collectForwardingHeaders(from({}))).toEqual({});
+  });
+
+  it.each([
+    ["x-api-key", "shyftent_supersecret"],
+    ["authorization", "Bearer eyJhbGciOi"],
+    ["cookie", "session=abc"],
+    ["x-forwarded-authorization", "Bearer leak"],
+  ])("never echoes back the credential header %s", (name, value) => {
+    const result = collectForwardingHeaders(from({ [name]: value }));
+    expect(JSON.stringify(result)).not.toContain(value);
+    expect(result[name]).toBeUndefined();
+  });
+
+  it("includes Cloudflare's client header, which survives a proxy that rewrites XFF", () => {
+    const result = collectForwardingHeaders(
+      from({ "cf-connecting-ip": "142.254.88.197", "cf-ray": "abc-CDG" })
+    );
+    expect(result["cf-connecting-ip"]).toBe("142.254.88.197");
+    expect(result["cf-ray"]).toBe("abc-CDG");
   });
 });

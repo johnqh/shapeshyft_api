@@ -21,13 +21,20 @@ import { db, llmApiKeys } from "../db";
 import {
   successResponse,
   errorResponse,
+  type ClientIpDiagnostics,
   type ProviderIpSyncResponse,
   type ProviderIpSyncSkipped,
   type ProviderIpSyncUnchanged,
   type ProviderIpSyncUpdated,
 } from "@sudobility/shapeshyft_types";
 import { ENTITY_API_KEY_PERMISSIONS } from "../lib/entity-helpers";
-import { resolveCallerIp, rewriteUrlHost } from "../lib/provider-url";
+import {
+  collectForwardingHeaders,
+  isRoutableClientIp,
+  normalizeClientIp,
+  resolveCallerIp,
+  rewriteUrlHost,
+} from "../lib/provider-url";
 
 const providerSyncRouter = new Hono();
 
@@ -49,6 +56,54 @@ function readPeerAddress(c: Context): string | null {
 }
 
 /**
+ * Reject anything that did not authenticate with an entity API key.
+ *
+ * @returns An error response to return, or null when the caller may proceed
+ */
+function requireEntityKey(c: Context) {
+  if (c.get("authMethod") !== "entity_api_key") {
+    return c.json(
+      errorResponse(
+        "This route requires an entity API key (X-API-Key: shyftent_...)"
+      ),
+      403
+    );
+  }
+  if (!c.get("entityApiKeyEntityId")) {
+    return c.json(errorResponse("API key is not bound to an entity"), 403);
+  }
+  return null;
+}
+
+/**
+ * GET /entities/self/providers/client-ip
+ *
+ * Report what the API sees about the caller's address, without changing
+ * anything. Which header carries the real client IP depends on the deployment's
+ * proxy chain -- Cloudflare in front of Traefik behaves differently from Traefik
+ * alone -- and reading it here is how you find out rather than guess.
+ *
+ * Only allowlisted forwarding headers are echoed; the caller's API key is not.
+ */
+providerSyncRouter.get("/client-ip", async c => {
+  const forbidden = requireEntityKey(c);
+  if (forbidden) return forbidden;
+
+  const peerRaw = readPeerAddress(c);
+  const peer = normalizeClientIp(peerRaw);
+
+  const diagnostics: ClientIpDiagnostics = {
+    peer_raw: peerRaw,
+    peer,
+    peer_is_public: peer !== null && isRoutableClientIp(peer),
+    resolved_ip: resolveCallerIp(peerRaw, name => c.req.header(name)),
+    forwarding_headers: collectForwardingHeaders(name => c.req.header(name)),
+  };
+
+  return c.json(successResponse<ClientIpDiagnostics>(diagnostics));
+});
+
+/**
  * POST /entities/self/providers/sync-ip
  *
  * Requires an entity API key: the entity comes from the key, and the address
@@ -58,14 +113,8 @@ function readPeerAddress(c: Context): string | null {
 providerSyncRouter.post("/sync-ip", async c => {
   // 1. Entity API key only. A Firebase session's peer address is the browser's,
   // which has nothing to do with where the provider is running.
-  if (c.get("authMethod") !== "entity_api_key") {
-    return c.json(
-      errorResponse(
-        "This route requires an entity API key (X-API-Key: shyftent_...)"
-      ),
-      403
-    );
-  }
+  const forbidden = requireEntityKey(c);
+  if (forbidden) return forbidden;
 
   if (!ENTITY_API_KEY_PERMISSIONS.canManageApiKeys) {
     return c.json(
@@ -75,9 +124,6 @@ providerSyncRouter.post("/sync-ip", async c => {
   }
 
   const entityId = c.get("entityApiKeyEntityId");
-  if (!entityId) {
-    return c.json(errorResponse("API key is not bound to an entity"), 403);
-  }
 
   // 2. The caller's address: the peer when they reached us directly, or what
   // our own proxy forwarded when they did not.

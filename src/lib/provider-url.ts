@@ -81,6 +81,54 @@ export function isRoutableClientIp(ip: string): boolean {
 }
 
 /**
+ * Headers that may carry a client address, and are safe to echo back.
+ *
+ * An explicit allowlist, never "every header": the request also carries the
+ * caller's `X-API-Key`, and a diagnostic that reflected the whole header set
+ * back would hand a credential to anything reading the response or the logs.
+ */
+export const FORWARDING_HEADERS = [
+  "x-forwarded-for",
+  "x-real-ip",
+  "cf-connecting-ip",
+  "true-client-ip",
+  "x-client-ip",
+  "x-cluster-client-ip",
+  "fastly-client-ip",
+  "x-original-forwarded-for",
+  "forwarded",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "cf-ray",
+  "cf-ipcountry",
+  "via",
+] as const;
+
+/**
+ * Gather the forwarding-related headers actually present on a request.
+ *
+ * For diagnosing what a deployment's proxies really send, which is the only
+ * reliable way to know which header holds the client address -- guessing it
+ * from an infrastructure repo is how a Cloudflare edge IP ends up written into
+ * a provider URL.
+ *
+ * @param getHeader - Case-insensitive header lookup
+ * @returns Only the allowlisted headers that are present
+ */
+export function collectForwardingHeaders(
+  getHeader: (name: string) => string | undefined
+): Record<string, string> {
+  const found: Record<string, string> = {};
+  for (const name of FORWARDING_HEADERS) {
+    const value = getHeader(name);
+    if (value !== undefined && value !== "") {
+      found[name] = value;
+    }
+  }
+  return found;
+}
+
+/**
  * Resolve who is really calling, given the connection's peer and its headers.
  *
  * A forwarded header is written by whoever is upstream, so it is only worth

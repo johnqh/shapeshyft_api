@@ -238,6 +238,7 @@ is rejected with 405. Provider routes set `Cache-Control: public, max-age=3600`.
 | GET/POST | `/entities/:entitySlug/projects/:projectId/endpoints` | Endpoints |
 | GET/PUT/DELETE | `/entities/:entitySlug/projects/:projectId/endpoints/:endpointId` | Endpoint CRUD |
 | GET | `/entities/:entitySlug/analytics` | Usage analytics |
+| GET | `/entities/self/providers/client-ip` | What the API sees about the caller's address (**entity API key only**, read-only) |
 | POST | `/entities/self/providers/sync-ip` | Point the entity's `lm_studio` providers at the caller's IP (**entity API key only**) |
 | GET | `/ratelimits/:entitySlug` | Tier config + current usage |
 | GET | `/ratelimits/:entitySlug/history/:periodType` | Usage history (`hour` \| `day` \| `month`) |
@@ -426,9 +427,28 @@ without the DNS, for a model server on a home connection.
 - Providers land in `updated` / `unchanged` / `skipped` buckets, so a cron job on
   the home machine can log what moved. The operation is idempotent.
 
-The route is mounted at `/entities/self/providers` and registered **before**
+The routes are mounted at `/entities/self/providers` and registered **before**
 `/entities`, so the literal `self` is not taken for an entity slug. The
-`/entities/` prefix is also what lets an entity key reach it at all.
+`/entities/` prefix is also what lets an entity key reach them at all.
+
+#### Diagnosing the proxy chain first
+
+`GET /entities/self/providers/client-ip` reports the peer, whether it is public,
+what `resolveCallerIp` would return, and the allowlisted forwarding headers that
+actually arrived. It changes nothing.
+
+**Use it before trusting any header in a new deployment.** Which header carries
+the real client address is a property of the deployment, not of the code, and
+reading it from an infrastructure repo is how a Cloudflare edge IP once got
+written into a live provider URL: `sudobility_dockerized` shows Traefik, but
+production also has Cloudflare in front of it. Traefik has no
+`forwardedHeaders.trustedIPs`, so it discards Cloudflare's `X-Forwarded-For` and
+replaces it with the Cloudflare edge address -- a *public* address, which passed
+every "is this routable" check.
+
+Only headers on `FORWARDING_HEADERS` are echoed. Never widen that to the whole
+header set: the request carries the caller's `X-API-Key`, and a diagnostic that
+reflected it would leak a credential into responses and logs.
 
 ### Finish Reason
 

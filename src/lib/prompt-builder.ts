@@ -319,14 +319,29 @@ export function formatStructuredInput(data: Record<string, unknown>): string {
     if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       lines.push(`- ${key}:`);
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        lines.push(`    - ${k}: ${JSON.stringify(v)}`);
+        lines.push(formatStructuredLine(k, v, "    "));
       }
     } else {
-      lines.push(`- ${key}: ${JSON.stringify(value)}`);
+      lines.push(formatStructuredLine(key, value, ""));
     }
   }
 
   return lines.join("\n");
+}
+
+function formatStructuredLine(
+  key: string,
+  value: unknown,
+  indent: string
+): string {
+  if (typeof value === "string" && value.includes("\n")) {
+    const block = value
+      .split(/\r?\n/)
+      .map(line => `${indent}    ${line}`)
+      .join("\n");
+    return `${indent}- ${key}: |\n${block}`;
+  }
+  return `${indent}- ${key}: ${JSON.stringify(value)}`;
 }
 
 /**

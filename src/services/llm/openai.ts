@@ -270,20 +270,34 @@ export class OpenAIProvider implements ILLMProvider {
 
     const rawResponse = toolCall.function.arguments;
 
+    const finishReason = normalizeFinishReason(
+      response.choices[0]?.finish_reason
+    );
+    const usage = {
+      promptTokens: response.usage?.prompt_tokens ?? 0,
+      completionTokens: response.usage?.completion_tokens ?? 0,
+      totalTokens: response.usage?.total_tokens ?? 0,
+    };
+
     /*
       Why the stop reason is read BEFORE parsing.
 
       A model that hits the output ceiling returns arguments cut off mid-value,
-      and `JSON.parse` then fails with something like "Expected ']'". Read in
-      that order, a truncation is reported to the caller as a malformed model —
-      which is the wrong diagnosis and, worse, not an actionable one: a caller
-      that knows the output was merely *cut* can retry or ask for less, where a
-      caller told the JSON was broken has nothing to act on.
+      and `JSON.parse` then fails with something like "Expected ']'". Return the
+      raw truncated arguments with finishReason instead, so the route can mark
+      the response as truncated and preserve usage for the caller.
     */
-    if (response.choices[0]?.finish_reason === "length") {
-      throw new Error(
-        `Model output was truncated at the token limit (finish_reason=length) after ${rawResponse.length} characters. The answer is incomplete; raise max_output_tokens or ask for less in one call.`
-      );
+    if (finishReason === "length") {
+      return {
+        content: rawResponse,
+        rawResponse,
+        usage,
+        model: response.model,
+        provider: this.providerName,
+        latencyMs,
+        finishReason,
+        generatedMedia: generatedMedia.length > 0 ? generatedMedia : undefined,
+      };
     }
 
     let content: unknown;
@@ -300,15 +314,11 @@ export class OpenAIProvider implements ILLMProvider {
     return {
       content,
       rawResponse,
-      usage: {
-        promptTokens: response.usage?.prompt_tokens ?? 0,
-        completionTokens: response.usage?.completion_tokens ?? 0,
-        totalTokens: response.usage?.total_tokens ?? 0,
-      },
+      usage,
       model: response.model,
       provider: this.providerName,
       latencyMs,
-      finishReason: normalizeFinishReason(response.choices[0]?.finish_reason),
+      finishReason,
       generatedMedia: generatedMedia.length > 0 ? generatedMedia : undefined,
     };
   }

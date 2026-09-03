@@ -325,6 +325,17 @@ describe("Prompt Builder", () => {
       expect(result).toContain("- name:");
       expect(result).toContain("- age:");
     });
+
+    it("should keep multi-line string fields readable", () => {
+      const result = formatStructuredInput({
+        brief: "Line one\nLine two",
+      });
+
+      expect(result).toContain("- brief: |");
+      expect(result).toContain("    Line one");
+      expect(result).toContain("    Line two");
+      expect(result).not.toContain("\\n");
+    });
   });
 
   describe("buildPrompts", () => {

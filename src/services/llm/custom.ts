@@ -10,7 +10,8 @@ import { extractJson } from "./extract-json";
 /**
  * Custom LLM Server provider that forwards requests to user's endpoint.
  * Expects the endpoint to follow OpenAI-compatible format.
- * Uses streaming to avoid LM Studio's 300s idle timeout.
+ * Streams the response so the connection is never idle, which is what keeps
+ * LM Studio from closing a long generation at its 300s limit.
  */
 export class CustomLLMProvider implements ILLMProvider {
   readonly providerName = "lm_studio" as const;
@@ -29,7 +30,19 @@ export class CustomLLMProvider implements ILLMProvider {
       url = url + "chat/completions";
     }
     this.endpointUrl = url;
-    this.timeout = 600_000; // 10 minutes (local models can be slow)
+    /*
+      A local model's ceiling is wall-clock, not money.
+
+      Ten minutes suits a chat-sized answer. A dense structured one is a
+      different scale: measured against LM Studio, a drum-kit section produced
+      6,274 tokens in 169 seconds — about 37 tokens a second — so a part twice
+      that size needs longer than the fixed ten minutes allowed, and the request
+      died mid-generation with the server perfectly healthy.
+
+      Configurable rather than simply raised, because the ceiling is a property
+      of the hardware behind the endpoint and only its operator knows it.
+    */
+    this.timeout = Number(process.env.LM_STUDIO_TIMEOUT_MS ?? 600_000);
   }
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
@@ -60,12 +73,39 @@ export class CustomLLMProvider implements ILLMProvider {
       throw new Error(`LLM Server error (${response.status}): ${errorText}`);
     }
 
-    const result = (await response.json()) as Record<string, unknown>;
+    const result = await this.readBody(response);
     const latencyMs = Date.now() - startTime;
+
+    /*
+      Why the stop reason is read BEFORE parsing.
+
+      A model that runs out of room returns JSON cut off mid-value, and the
+      parse below then fails with a syntax error — so a truncation is reported
+      to the caller as a malformed model, which is the wrong diagnosis and, more
+      importantly, not an actionable one. A caller told the answer was merely
+      CUT can retry or ask for less; a caller told the JSON was broken has
+      nothing to act on.
+
+      This is the same ordering `openai.ts` needed. It cost real time here: four
+      local-model runs were diagnosed as "produces invalid JSON" and treated
+      with retries, when the model was producing valid JSON and simply being
+      truncated — the `finish_reason` saying so was already in the payload.
+    */
+    const finishReason = normalizeFinishReason(
+      (
+        ((result.choices as Array<Record<string, unknown>> | undefined)?.[0] ??
+          {}) as Record<string, unknown>
+      ).finish_reason
+    );
+    const usage = this.extractUsage(result);
+    if (finishReason === "length") {
+      throw new Error(
+        `Model output was truncated at the token limit (finish_reason=length) after ${usage.completionTokens} completion tokens with ${usage.promptTokens} in the prompt. The answer is incomplete; raise the ceiling, enlarge the context, or ask for less in one call.`
+      );
+    }
 
     // Parse response - try multiple common formats
     const { rawResponse, content } = this.parseResponse(result);
-    const usage = this.extractUsage(result);
 
     return {
       content,
@@ -74,12 +114,82 @@ export class CustomLLMProvider implements ILLMProvider {
       model: request.model ?? "custom",
       provider: this.providerName,
       latencyMs,
-      finishReason: normalizeFinishReason(
-        (
-          (result.choices as Array<Record<string, unknown>> | undefined)?.[0] ??
-          {}
-        ).finish_reason
-      ),
+      finishReason,
+    };
+  }
+
+  /**
+   * The provider's answer, whether it streamed or not.
+   *
+   * A stream is reassembled into the same object a non-streamed reply would
+   * have produced, so everything downstream — the stop-reason check, the JSON
+   * extraction, the usage — is unchanged and unaware. Servers that ignore
+   * `stream` and answer with plain JSON still work: the content type decides.
+   */
+  private async readBody(response: Response): Promise<Record<string, unknown>> {
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("text/event-stream")) {
+      return (await response.json()) as Record<string, unknown>;
+    }
+
+    let content = "";
+    let finishReason: unknown = null;
+    let usage: unknown = null;
+    let buffer = "";
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("LLM Server returned an empty stream");
+    const decoder = new TextDecoder();
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE frames are newline-delimited; a partial one stays in the buffer.
+      let newline: number;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim();
+        if (data === "[DONE]") continue;
+        let chunk: Record<string, unknown>;
+        try {
+          chunk = JSON.parse(data) as Record<string, unknown>;
+        } catch {
+          continue; // a keep-alive or a comment frame, not a delta
+        }
+        const choice = (
+          chunk.choices as Array<Record<string, unknown>> | undefined
+        )?.[0];
+        const delta = choice?.delta as { content?: string } | undefined;
+        if (typeof delta?.content === "string") content += delta.content;
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
+        if (chunk.usage) usage = chunk.usage;
+      }
+    }
+
+    /*
+      An empty stream is its own failure, and has to say so.
+
+      `parseResponse` tests `message?.content` for truthiness, so an empty
+      string falls through every branch and surfaces as "Unable to parse
+      OpenAI-format response" — which describes a shape problem when the shape
+      was fine and the model simply sent nothing. That is the same class of
+      misreport as parsing before reading `finish_reason`.
+    */
+    if (content === "") {
+      throw new Error(
+        `LLM Server streamed no content${
+          finishReason ? ` (finish_reason=${String(finishReason)})` : ""
+        }. The connection stayed open but the model produced nothing.`
+      );
+    }
+
+    return {
+      choices: [{ message: { content }, finish_reason: finishReason }],
+      ...(usage ? { usage } : {}),
     };
   }
 
@@ -105,8 +215,11 @@ export class CustomLLMProvider implements ILLMProvider {
         const toolCall = message.tool_calls[0] as Record<string, unknown>;
         const func = toolCall.function as Record<string, unknown>;
         rawResponse = func.arguments as string;
-      } else if (message?.content) {
-        rawResponse = message.content as string;
+      } else if (
+        typeof message?.content === "string" &&
+        message.content !== ""
+      ) {
+        rawResponse = message.content;
       } else if (choice.text) {
         rawResponse = choice.text as string;
       } else {
@@ -336,6 +449,21 @@ export class CustomLLMProvider implements ILLMProvider {
       messages,
       temperature: request.temperature ?? 0,
       max_tokens: request.maxTokens,
+      /*
+        Streamed so the connection is never idle.
+
+        LM Studio closes a request that has sent nothing for 300 seconds, and a
+        non-streamed call sends nothing at all until the model has finished — so
+        any answer taking longer than five minutes died mid-generation with the
+        server working normally. Measured: ordinary parts returned in 86-175s
+        while a drum kit, three times denser per bar, ran past it every time.
+
+        This file's header has claimed streaming since it was written; it was
+        never actually turned on. `include_usage` asks for the token counts in
+        the final chunk, which a stream otherwise omits.
+      */
+      stream: true,
+      stream_options: { include_usage: true },
     };
 
     // Include model if specified (required when multiple models are loaded, e.g., LM Studio)

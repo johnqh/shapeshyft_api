@@ -121,10 +121,11 @@ bun run dev          # Start dev server with hot reload (--watch)
 bun run start        # Start production server
 bun run build        # Build for production (bun build)
 bun run start:prod   # Run production build
-bun run test         # Run unit tests, Vitest (tests/unit/)
+bun run test         # Unit tests, Vitest. Never touches a database; this is what CI runs.
 bun run test:watch   # Watch mode for unit tests
-bun run test:integration  # Run integration tests (requires test database)
-bun run test:setup   # Set up test database
+bun run test:db      # Database tests (*.db.test.ts), Vitest. MANUAL -- never run in CI.
+                     # Requires TEST_DATABASE_URL pointing at localhost; refuses any other host.
+bun run test:db:setup  # Create the local shapeshyft_test database
 bun run lint         # Run ESLint
 bun run typecheck    # TypeScript type check
 bun run format       # Format with Prettier
@@ -584,8 +585,8 @@ environment does not provide. Do not "fix" an integration test by converting it
 to Vitest imports -- it will fail with `ReferenceError: Bun is not defined`.
 
 ```bash
-bun run test                       # Unit tests, Vitest (tests/unit/)
-bun run test:integration           # Integration tests, bun:test (requires database)
+bun run test                       # Unit tests, Vitest (excludes *.db.test.ts)
+bun run test:db                    # Database tests, Vitest (*.db.test.ts only, manual)
 bunx vitest run tests/unit/encryption.test.ts  # Single unit test file
 bun test tests/keys.test.ts            # Single integration test file
 ```
@@ -701,7 +702,7 @@ bun run verify  # Runs: typecheck + lint + unit tests
 
 For integration tests (requires test database):
 ```bash
-bun run test:setup && bun run test:integration
+bun run test:db:setup && TEST_DATABASE_URL=postgresql://localhost:5432/shapeshyft_test bun run test:db
 ```
 
 ## Gotchas
@@ -711,7 +712,11 @@ bun run test:setup && bun run test:integration
 - **`initDatabase()` is the migration system** -- there is no migration tool. It creates the schema, enums, tables, and indexes, then applies additive `ALTER TABLE ... IF NOT EXISTS` column migrations, and it runs on **every** server boot as well as via `bun run db:init`. Every statement is idempotent, so it is safe to re-run; it is also why a new column must be added there by hand, not just to `schema.ts`.
 - **`ENCRYPTION_KEY` must be 64-character hex** -- LLM API keys and storage credentials are encrypted at rest. Missing this causes runtime errors.
 - **Tables live in `shapeshyft` PostgreSQL schema** -- not the default `public` schema. All table creation uses `shapeshyftSchema.table()`.
-- **Two test runners** -- `bun run test` runs `tests/unit/` under **Vitest**; `bun run test:integration` runs `tests/*.test.ts` under **`bun:test`** and needs a real database. Integration tests must use `bun:test` imports: they load routes that import `hono/bun`, and the `Bun` global does not exist under Vitest.
+- **One test runner, two configs.** Everything runs under Vitest. `bun run test` uses `vitest.config.ts`, which *excludes* `**/*.db.test.ts` -- database suites are never collected, so a CI run cannot reach a database. `bun run test:db` uses `vitest.db.config.ts`, which collects only those files and is run by hand.
+- **Database tests are named `*.db.test.ts`.** The suffix is the only marker; the directory is irrelevant.
+- **`TEST_DATABASE_URL`, not `DATABASE_URL`.** `tests/setup.db.ts` validates it points at exactly `localhost` (`127.0.0.1` is refused) and only then assigns `DATABASE_URL`. `tests/setup.ts` deletes `DATABASE_URL` outright, so a production URL exported in your shell can never reach a test.
+- **`hono/bun` is aliased in tests.** `src/routes/provider-sync.ts` imports `getConnInfo` from `hono/bun`, which only resolves under the Bun runtime. `tests/stubs/hono-bun.ts` mirrors the real adapter -- it reads the peer from the server object Hono receives as `env`, which the suites supply themselves -- so routes stay unmodified. Do not make it return a fixed address; that would override each suite's own fixture.
+- **`@sudobility` service packages are inlined** via `server.deps.inline`. They are compiled by `tsc` with extensionless and directory-style relative imports, which Bun resolves and Node's ESM resolver rejects.
 - **`@sudobility/*` packages do not load under Vitest** -- several ship ESM with extensionless relative imports (`export ... from "./init"`), which Node's resolver rejects for an externalized dependency. This is another reason integration tests run under `bun test`.
 - **Six `@sudobility/*` dependencies** -- version mismatches between them are the most common cause of type errors.
 - **Lazy Proxy-based db connection** -- the database is not connected at module load. First access triggers initialization. This is intentional for test isolation.

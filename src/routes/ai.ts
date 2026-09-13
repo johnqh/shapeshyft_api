@@ -691,6 +691,16 @@ async function handleAIRequest(c: any) {
     // null means the endpoint opted out of runaway protection; the providers
     // treat undefined as "no limit".
     maxTokens: ceiling.value ?? undefined,
+    /*
+      NULL becomes undefined rather than 0, and the two are different answers.
+
+      Undefined leaves every adapter exactly as it was: OpenAI, Gemini, Groq
+      and the custom provider apply their own `?? 0`, while Anthropic omits the
+      field entirely because Opus 4.7+ and Sonnet 5 reject it with a 400.
+      Passing 0 here would send a value to the models that refuse one, and
+      would do it to every endpoint that predates this column.
+    */
+    temperature: endpoint.temperature ?? undefined,
   };
 
   const llmRequest: LLMRequest =

@@ -200,6 +200,7 @@ endpointsRouter.post(
           expects_media_output: body.expects_media_output ?? null,
           output_media_format: body.output_media_format ?? null,
           web_search: body.web_search ?? false,
+          temperature: body.temperature ?? null,
           // Zod supplies DEFAULT_MAX_OUTPUT_TOKENS when omitted, so `?? null`
           // here only fires for an explicit null -- an opt-out, not an accident.
           max_output_tokens: body.max_output_tokens ?? null,
@@ -333,6 +334,16 @@ endpointsRouter.put(
             current.output_media_format
           ),
           web_search: body.web_search ?? current.web_search,
+          /*
+            `undefined` leaves it alone; an explicit `null` clears it. The
+            nullish coalescing used by its neighbours cannot express the
+            second, and clearing a temperature is how an endpoint goes back to
+            whatever its provider does by default.
+          */
+          temperature:
+            body.temperature === undefined
+              ? current.temperature
+              : body.temperature,
           max_output_tokens: handleNullable(
             body.max_output_tokens,
             current.max_output_tokens

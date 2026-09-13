@@ -225,6 +225,16 @@ export const endpointCreateSchema = z.object({
   output_media_format: outputMediaFormatSchema,
   web_search: z.boolean().optional().default(false),
   /**
+   * Sampling temperature, or null/omitted to leave it to the provider.
+   *
+   * 0 to 2 is OpenAI's and Gemini's range; Anthropic's is 0 to 1 and it will
+   * refuse anything above that. Deliberately not clamped per provider here: an
+   * endpoint can be pointed at another model after it is created, and a value
+   * silently rewritten at save time would then be the wrong one with nobody
+   * told. The provider's own 400 is the honest answer.
+   */
+  temperature: z.number().min(0).max(2).nullish(),
+  /**
    * Output ceiling. Omitted -> DEFAULT_MAX_OUTPUT_TOKENS, so every creation
    * path (dashboard, API, MCP) gets protection without asking. Explicit null ->
    * no protection, for the operator who genuinely wants an uncapped endpoint.
@@ -255,6 +265,8 @@ export const endpointUpdateSchema = z.object({
   expects_media_output: mediaOutputConfigSchema,
   output_media_format: outputMediaFormatSchema,
   web_search: z.boolean().optional(),
+  /** Omitted -> unchanged; null -> say nothing about sampling again. */
+  temperature: z.number().min(0).max(2).nullish(),
   /** Omitted -> unchanged; null -> remove the ceiling. */
   max_output_tokens: z.number().int().positive().max(1_000_000).nullish(),
   // For Whisper endpoints: model to use for structured extraction

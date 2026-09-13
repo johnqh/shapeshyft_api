@@ -15,6 +15,7 @@ import {
   timestamp,
   integer,
   jsonb,
+  real,
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
@@ -252,6 +253,18 @@ export const endpoints = shapeshyftSchema.table(
     output_media_format: varchar("output_media_format", { length: 20 }),
     // Enable web search for supported providers (OpenAI Responses API)
     web_search: boolean("web_search").default(false),
+    /**
+     * Sampling temperature for this endpoint's model, or NULL to say nothing.
+     *
+     * NULL rather than a default of 0, and the distinction is load-bearing:
+     * the adapters disagree about what "unset" means. OpenAI, Gemini, Groq and
+     * the custom provider default it to 0; Anthropic omits the field entirely,
+     * because Opus 4.7+ and Sonnet 5 reject `temperature` with a 400. A column
+     * defaulting to 0 would start sending a value to the models that refuse
+     * one, so every endpoint that predates this keeps its NULL and its
+     * behaviour.
+     */
+    temperature: real("temperature"),
     /**
      * Ceiling on tokens the model may generate per invocation.
      *

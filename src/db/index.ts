@@ -423,6 +423,21 @@ export async function initDatabase() {
     END $$;
   `;
 
+  // Add temperature column
+  await client`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'shapeshyft'
+        AND table_name = 'endpoints'
+        AND column_name = 'temperature'
+      ) THEN
+        ALTER TABLE shapeshyft.endpoints ADD COLUMN temperature REAL;
+      END IF;
+    END $$;
+  `;
+
   // Add transcription_extraction_model column
   await client`
     DO $$

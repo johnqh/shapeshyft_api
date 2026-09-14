@@ -1,6 +1,6 @@
 {
   "name": "shapeshyft_api",
-  "version": "1.0.132",
+  "version": "1.0.133",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
@@ -60,7 +60,7 @@
     "openai": "^4.77.0",
     "postgres": "^3.4.7",
     "resend": "^6.9.2",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "zod": "^3.24.0"
   },
   "repository": {

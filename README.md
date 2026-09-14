@@ -55,9 +55,9 @@ curl -X POST https://api.shapeshyft.ai/api/v1/users/<uid>/api-keys \
 
 Supports 10 LLM providers: OpenAI, Anthropic, Gemini, Groq, Mistral, xAI, DeepSeek, Perplexity, Cohere, LM Studio.
 
-> Cohere is in the catalog but is currently routed through the OpenAI-compatible
-> provider, which its API does not match. It will not work until it gets a
-> dedicated provider class.
+> Cohere is reached through its OpenAI-compatible Compatibility API
+> (`https://api.cohere.ai/compatibility/v1`), with structured output requested via
+> `response_format` because that API has no `tool_choice`.
 
 ## Development
 

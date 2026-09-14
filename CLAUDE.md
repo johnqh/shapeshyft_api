@@ -281,7 +281,7 @@ not a bare user id. Route handlers should pass `getActor(c)`:
 Uses a factory pattern (`createLLMProvider`) over 5 provider classes:
 - `OpenAIProvider` -- OpenAI itself, plus Mistral, xAI, DeepSeek, and Perplexity, each
   given its own base URL from `OPENAI_COMPATIBLE_BASE_URLS` so requests do not fall
-  through to `api.openai.com`. Cohere is also routed here but **does not work** (see below).
+  through to `api.openai.com`. Cohere is served here too, through its Compatibility API.
 - `AnthropicProvider` -- uses tool_use for structured output
 - `GeminiProvider` -- uses native `responseSchema` for structured JSON
 - `GroqProvider` -- dedicated Whisper transcription + extraction pipeline
@@ -292,6 +292,8 @@ Uses a factory pattern (`createLLMProvider`) over 5 provider classes:
 Each provider uses its native structured output mechanism:
 - OpenAI/Groq/compatible: Function calling -- `tools` plus a forced
   `tool_choice` on a function named `structured_response`
+- Cohere: `response_format: { type: "json_object", schema }` -- its Compatibility API
+  takes no `tool_choice` (engine `cohere-schema.ts`)
 - Anthropic: Tool use (`tools` + `tool_choice`)
 - Gemini: Response schema (`responseMimeType: "application/json"` + `responseSchema`)
 - Custom/LM Studio: System prompt instructions with JSON extraction
@@ -712,8 +714,8 @@ bun run test:db:setup && TEST_DATABASE_URL=postgresql://localhost:5432/shapeshyf
 - **Rate limiting fails open** -- an unconfigured or throwing RevenueCat lookup logs and lets the request through. Site-admin-owned entities skip the check entirely.
 - **IP allowlist on endpoints** -- optional IPv4 allowlist. When set, requests from IPs not in the list are rejected.
 - **Provider factory reuses OpenAIProvider** -- Mistral, xAI, DeepSeek, and Perplexity use `OpenAIProvider` with their own base URLs, since their APIs are OpenAI-compatible.
-- **Cohere is listed but does not work** -- it is routed through `OpenAIProvider` with no base URL override, and Cohere's API is not OpenAI-compatible in either request or response shape. `services/llm/index.ts` carries a comment saying so. It needs a dedicated provider before the catalog entry is truthful.
-- **Groq Whisper has two-stage pipeline** -- transcription via Whisper, then optional structured extraction via a configurable second model/provider.
+- **Cohere uses `response_format`, not a tool call** -- it goes through `OpenAIProvider` at Cohere's Compatibility API (`https://api.cohere.ai/compatibility/v1`), which accepts `tools` but not `tool_choice`, so a call cannot be forced. `cohereResponseFormat` strips the JSON Schema keywords Cohere rejects (`minimum`/`maximum`, `minItems`/`maxItems`, `minLength`/`maxLength`, `allOf`/`oneOf`/`not`, most `format`s, anchored `pattern`s); a schema whose objects lack a `required` field falls back to plain JSON mode, and the system prompt still describes the full schema either way.
+- **Groq Whisper has two-stage pipeline** -- transcription via Whisper, then optional structured extraction via the endpoint's `transcription_extraction_model`. That model runs on the endpoint's own credential, so it must be a Groq model; any other is rejected with 400 rather than handed the Groq key.
 - **Imagen/Veo are stubs** -- Gemini generative models (Imagen, Veo) require Vertex AI SDK which is not yet integrated.
 - **Media conversion only for images** -- SVG, TIFF, HEIC, BMP, AVIF are converted to PNG via Sharp. Audio/video conversion is not supported.
 - **SSRF prevention** -- only `gs://` URLs are allowed for media input. HTTP/HTTPS URLs are rejected to prevent server-side request forgery.

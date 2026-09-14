@@ -8,9 +8,10 @@ import {
 } from "vitest";
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import routes from "../src/routes";
+import { routes, service } from "../src/service";
 import { db, llmApiKeys } from "../src/db";
-import { entityHelpers } from "../src/lib/entity-helpers";
+
+const { entityHelpers } = service.ctx.entityAccess;
 import { cleanupTestUser, createTestUserWithEntity } from "./utils/test-db";
 import type { MockFirebaseUser } from "./utils/mock-auth";
 

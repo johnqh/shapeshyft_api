@@ -9,7 +9,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { bodyLimit } from "hono/body-limit";
 import { initDatabase, db } from "./db";
-import routes from "./routes";
+import { routes } from "./service";
 import { successResponse, errorResponse } from "@sudobility/shapeshyft_types";
 import { getEnv } from "./lib/env-helper";
 import { sql } from "drizzle-orm";

@@ -375,3 +375,28 @@ Stage per repo. Messages: `chore: consume shaperouter_types 0.0.2` (consumers), 
 - [ ] **Step 6: Tell the user the stash can be dropped**
 
 Report: `git stash list` in `shaperouter_api` holds the superseded temperature port. Offer to drop it; do not run `git stash drop` without an explicit yes.
+
+---
+
+## Execution notes (2026-09-14)
+
+- **Task 1:** `shaperouter_types` also held an uncommitted types-side port of
+  temperature. Its export names match the committed baseline, so it was stashed
+  (not overwritten) before `src/index.ts` was replaced. The version is left at
+  `0.0.1` for `push_all.sh` to bump; `shaperouter_api` was developed against a
+  locally packed build of it.
+- **Task 3:** the rename loop must iterate files with `while IFS= read -r f`;
+  zsh does not word-split an unquoted `$FILES`, so the `for f in $FILES` form
+  silently renamed nothing on the first attempt. Two doc comments naming the
+  `shapeshyft` schema needed a hand edit afterwards.
+- **Parity:** all 84 fork DB tests pass, plus the 4 temperature tests the shared
+  code brings and the 8 resolver/migration tests; unit tests 356 → 109, the same
+  files and counts as `shapeshyft_api`. Both products create the same tables.
+- **Task 4, consumers:** with the packed types *and* `@sudobility/shapeshyft_engine`
+  present (types re-export the engine, so an unpacked types tarball alone fails
+  with missing-export errors), `shaperouter_client` and `shaperouter_lib`
+  typecheck with zero errors before and after. `shaperouter_app` had 4 errors
+  from its own uncommitted temperature UI (`EndpointForm.tsx` plus 15
+  `dashboard.json` locales) against the old types; the new types clear them.
+- `sharp` is `^0.35.4` and the tamper test in `tests/unit/encryption.test.ts` is
+  deterministic, matching `shapeshyft_api`.
